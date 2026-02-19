@@ -28,4 +28,8 @@ pub enum TreasuryError {
     AlreadyApproved = 10,
     /// The address is already registered as a signer.
     AlreadyASigner = 11,
+    /// The balance is insufficient for the requested operation.
+    InsufficientBalance = 12,
+    /// The proposal has expired and can no longer be executed.
+    ProposalExpired = 13,
 }
