@@ -369,4 +369,29 @@ impl TreasuryContract {
     }
 }
 
+/// Helper function to require that the contract has been initialized.
+///
+/// # Arguments
+/// * `env` - The Soroban environment
+///
+/// # Returns
+/// * `Ok(())` if the contract is initialized
+/// * `Err(TreasuryError::NotInitialized)` if not initialized
+///
+/// # Usage
+/// Call this at the start of any function that requires the contract to be initialized:
+/// ```rust
+/// fn some_function(env: Env, ...) {
+///     require_initialized(&env)?;
+///     // ... rest of function
+/// }
+/// ```
+pub fn require_initialized(env: &Env) -> Result<(), TreasuryError> {
+    if !has_admin(env) {
+        Err(TreasuryError::NotInitialized)
+    } else {
+        Ok(())
+    }
+}
+
 mod test;
