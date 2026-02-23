@@ -34,7 +34,10 @@ pub fn set_admin(env: &Env, admin: &Address) {
 // ── Stream count helpers ─────────────────────────────────────────
 
 pub fn get_stream_count(env: &Env) -> u32 {
-    env.storage().instance().get(&DataKey::StreamCount).unwrap_or(0)
+    env.storage()
+        .instance()
+        .get(&DataKey::StreamCount)
+        .unwrap_or(0)
 }
 
 pub fn set_stream_count(env: &Env, count: u32) {

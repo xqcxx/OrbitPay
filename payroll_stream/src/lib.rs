@@ -1,5 +1,5 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, Address, Env, Vec, symbol_short};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Vec};
 
 mod errors;
 mod storage;
@@ -7,9 +7,8 @@ mod types;
 
 use errors::StreamError;
 use storage::{
-    get_admin, has_admin, set_admin, get_stream_count, set_stream_count,
-    get_stream, set_stream, add_sender_stream, add_recipient_stream,
-    get_sender_streams, get_recipient_streams,
+    add_recipient_stream, add_sender_stream, get_admin, get_recipient_streams, get_sender_streams,
+    get_stream, get_stream_count, has_admin, set_admin, set_stream, set_stream_count,
 };
 use types::{PayrollStream, StreamStatus};
 
@@ -27,10 +26,8 @@ impl PayrollStreamContract {
         set_admin(&env, &admin);
         set_stream_count(&env, 0);
 
-        env.events().publish(
-            (symbol_short!("init"),),
-            admin.clone(),
-        );
+        env.events()
+            .publish((symbol_short!("init"),), admin.clone());
 
         Ok(())
     }
@@ -77,6 +74,8 @@ impl PayrollStreamContract {
             last_claim_time: start_time,
             status: StreamStatus::Active,
             rate_per_second,
+            paused_at: None,
+            total_paused_duration: 0,
         };
 
         // TODO: Transfer total_amount from sender to contract (contributor task SC-10)
@@ -87,10 +86,8 @@ impl PayrollStreamContract {
         add_sender_stream(&env, &sender, stream_id);
         add_recipient_stream(&env, &recipient, stream_id);
 
-        env.events().publish(
-            (symbol_short!("s_create"), sender.clone()),
-            stream_id,
-        );
+        env.events()
+            .publish((symbol_short!("s_create"), sender.clone()), stream_id);
 
         Ok(stream_id)
     }
@@ -103,11 +100,13 @@ impl PayrollStreamContract {
         }
         recipient.require_auth();
 
-        let mut stream = get_stream(&env, stream_id)
-            .ok_or(StreamError::StreamNotFound)?;
+        let mut stream = get_stream(&env, stream_id).ok_or(StreamError::StreamNotFound)?;
 
         if stream.recipient != recipient {
             return Err(StreamError::Unauthorized);
+        }
+        if stream.status == StreamStatus::Paused {
+            return Err(StreamError::StreamAlreadyPaused);
         }
         if stream.status == StreamStatus::Cancelled {
             return Err(StreamError::StreamAlreadyCancelled);
@@ -136,28 +135,21 @@ impl PayrollStreamContract {
 
         set_stream(&env, stream_id, &stream);
 
-        env.events().publish(
-            (symbol_short!("claim"), recipient.clone()),
-            claimable,
-        );
+        env.events()
+            .publish((symbol_short!("claim"), recipient.clone()), claimable);
 
         Ok(claimable)
     }
 
     /// Cancel a stream. Only the sender (organization) can cancel.
     /// Unclaimed tokens are returned to the sender. Already-claimed tokens stay with recipient.
-    pub fn cancel_stream(
-        env: Env,
-        sender: Address,
-        stream_id: u32,
-    ) -> Result<(), StreamError> {
+    pub fn cancel_stream(env: Env, sender: Address, stream_id: u32) -> Result<(), StreamError> {
         if !has_admin(&env) {
             return Err(StreamError::NotInitialized);
         }
         sender.require_auth();
 
-        let mut stream = get_stream(&env, stream_id)
-            .ok_or(StreamError::StreamNotFound)?;
+        let mut stream = get_stream(&env, stream_id).ok_or(StreamError::StreamNotFound)?;
 
         if stream.sender != sender {
             return Err(StreamError::Unauthorized);
@@ -185,10 +177,67 @@ impl PayrollStreamContract {
 
         set_stream(&env, stream_id, &stream);
 
-        env.events().publish(
-            (symbol_short!("cancel"), sender.clone()),
-            stream_id,
-        );
+        env.events()
+            .publish((symbol_short!("cancel"), sender.clone()), stream_id);
+
+        Ok(())
+    }
+
+    /// Pause an active stream. Only the sender (organization) can pause.
+    pub fn pause_stream(env: Env, sender: Address, stream_id: u32) -> Result<(), StreamError> {
+        if !has_admin(&env) {
+            return Err(StreamError::NotInitialized);
+        }
+        sender.require_auth();
+
+        let mut stream = get_stream(&env, stream_id).ok_or(StreamError::StreamNotFound)?;
+
+        if stream.sender != sender {
+            return Err(StreamError::Unauthorized);
+        }
+        if stream.status != StreamStatus::Active {
+            return Err(StreamError::StreamAlreadyPaused);
+        }
+
+        stream.status = StreamStatus::Paused;
+        stream.paused_at = Some(env.ledger().timestamp());
+
+        set_stream(&env, stream_id, &stream);
+
+        env.events()
+            .publish((symbol_short!("pause"), sender.clone()), stream_id);
+
+        Ok(())
+    }
+
+    /// Resume a paused stream. Only the sender (organization) can resume.
+    pub fn resume_stream(env: Env, sender: Address, stream_id: u32) -> Result<(), StreamError> {
+        if !has_admin(&env) {
+            return Err(StreamError::NotInitialized);
+        }
+        sender.require_auth();
+
+        let mut stream = get_stream(&env, stream_id).ok_or(StreamError::StreamNotFound)?;
+
+        if stream.sender != sender {
+            return Err(StreamError::Unauthorized);
+        }
+        if stream.status != StreamStatus::Paused {
+            return Err(StreamError::StreamNotPaused);
+        }
+
+        if let Some(paused_at) = stream.paused_at {
+            let now = env.ledger().timestamp();
+            let pause_duration = now - paused_at;
+            stream.total_paused_duration += pause_duration;
+        }
+        stream.paused_at = None;
+        stream.status = StreamStatus::Active;
+
+        set_stream(&env, stream_id, &stream);
+
+        env.events()
+            .publish((symbol_short!("resume"), sender.clone()), stream_id);
 
         Ok(())
     }
@@ -203,16 +252,30 @@ impl PayrollStreamContract {
             return 0;
         }
 
-        let effective_time = if now >= stream.end_time {
+        let mut effective_time = if now >= stream.end_time {
             stream.end_time
         } else {
             now
         };
 
-        let elapsed = effective_time - stream.start_time;
+        if stream.status == StreamStatus::Paused {
+            if let Some(paused_at) = stream.paused_at {
+                effective_time = paused_at;
+            }
+        }
+
+        let mut elapsed = effective_time - stream.start_time;
+
+        if stream.total_paused_duration > 0 {
+            if elapsed > stream.total_paused_duration {
+                elapsed = elapsed.saturating_sub(stream.total_paused_duration);
+            } else {
+                elapsed = 0;
+            }
+        }
+
         let total_accrued = stream.rate_per_second * (elapsed as i128);
 
-        // Clamp to total_amount to handle rounding
         let total_accrued = if total_accrued > stream.total_amount {
             stream.total_amount
         } else {
@@ -231,8 +294,7 @@ impl PayrollStreamContract {
 
     /// Get the claimable balance for a stream at the current time.
     pub fn get_claimable(env: Env, stream_id: u32) -> Result<i128, StreamError> {
-        let stream = get_stream(&env, stream_id)
-            .ok_or(StreamError::StreamNotFound)?;
+        let stream = get_stream(&env, stream_id).ok_or(StreamError::StreamNotFound)?;
         Ok(Self::calculate_claimable(&env, &stream))
     }
 
@@ -260,7 +322,11 @@ impl PayrollStreamContract {
     }
 
     /// Upgrade the contract WASM. Restricted to admin.
-    pub fn upgrade(env: Env, admin: Address, new_wasm_hash: soroban_sdk::BytesN<32>) -> Result<(), StreamError> {
+    pub fn upgrade(
+        env: Env,
+        admin: Address,
+        new_wasm_hash: soroban_sdk::BytesN<32>,
+    ) -> Result<(), StreamError> {
         let stored_admin = get_admin(&env);
         if admin != stored_admin {
             return Err(StreamError::Unauthorized);
