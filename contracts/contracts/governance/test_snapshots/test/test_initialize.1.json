@@ -32,6 +32,9 @@
                 },
                 {
                   "u64": 604800
+                },
+                {
+                  "u64": 3600
                 }
               ]
             }
@@ -87,6 +90,18 @@
                         },
                         "val": {
                           "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "GracePeriod"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "u64": 3600
                         }
                       },
                       {
