@@ -48,17 +48,24 @@ pub fn get_threshold(env: &Env) -> u32 {
 }
 
 pub fn set_threshold(env: &Env, threshold: u32) {
-    env.storage().instance().set(&DataKey::Threshold, &threshold);
+    env.storage()
+        .instance()
+        .set(&DataKey::Threshold, &threshold);
 }
 
 // ── Proposal count helpers ───────────────────────────────────────
 
 pub fn get_proposal_count(env: &Env) -> u32 {
-    env.storage().instance().get(&DataKey::ProposalCount).unwrap()
+    env.storage()
+        .instance()
+        .get(&DataKey::ProposalCount)
+        .unwrap()
 }
 
 pub fn set_proposal_count(env: &Env, count: u32) {
-    env.storage().instance().set(&DataKey::ProposalCount, &count);
+    env.storage()
+        .instance()
+        .set(&DataKey::ProposalCount, &count);
 }
 
 // ── Withdrawal helpers ──────────────────────────────────────────
@@ -68,5 +75,7 @@ pub fn get_withdrawal(env: &Env, id: u32) -> Option<WithdrawalRequest> {
 }
 
 pub fn set_withdrawal(env: &Env, id: u32, request: &WithdrawalRequest) {
-    env.storage().persistent().set(&DataKey::Withdrawal(id), request);
+    env.storage()
+        .persistent()
+        .set(&DataKey::Withdrawal(id), request);
 }

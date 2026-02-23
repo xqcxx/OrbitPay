@@ -1,4 +1,4 @@
-use soroban_sdk::{contracterror};
+use soroban_sdk::contracterror;
 
 /// Error codes for the Treasury contract.
 /// Each variant maps to a unique u32 for on-chain error reporting.

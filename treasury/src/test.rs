@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{testutils::Address as _, Address, Env, Symbol, Vec, symbol_short};
+use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Symbol, Vec};
 use types::WithdrawalStatus;
 
 fn setup_env() -> (Env, Address, TreasuryContractClient<'static>) {

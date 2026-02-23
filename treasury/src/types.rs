@@ -1,5 +1,74 @@
 use soroban_sdk::{contracttype, Address, Symbol, Vec};
 
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct TreasuryDepositEvent {
+    pub depositor: Address,
+    pub token: Address,
+    pub amount: i128,
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct TreasuryInitializedEvent {
+    pub admin: Address,
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct WithdrawalCreatedEvent {
+    pub proposal_id: u32,
+    pub proposer: Address,
+    pub token: Address,
+    pub recipient: Address,
+    pub amount: i128,
+    pub memo: Symbol,
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct WithdrawalApprovedEvent {
+    pub proposal_id: u32,
+    pub signer: Address,
+    pub approval_count: u32,
+    pub threshold: u32,
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct WithdrawalExecutedEvent {
+    pub proposal_id: u32,
+    pub recipient: Address,
+    pub token: Address,
+    pub amount: i128,
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct WithdrawalCancelledEvent {
+    pub proposal_id: u32,
+    pub caller: Address,
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct SignerAddedEvent {
+    pub new_signer: Address,
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct SignerRemovedEvent {
+    pub removed_signer: Address,
+}
+
+#[contracttype]
+#[derive(Clone, Debug)]
+pub struct ThresholdUpdatedEvent {
+    pub old_threshold: u32,
+    pub new_threshold: u32,
+}
+
 /// Represents the status of a withdrawal request in the multi-sig flow.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
