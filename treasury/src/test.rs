@@ -152,3 +152,22 @@ fn test_cancel_unauthorized() {
 // - test_execute_withdrawal
 // - test_cancel_withdrawal
 // - test_invalid_threshold_rejected
+
+#[test]
+fn test_deposit_and_balance() {
+    let (env, admin, client) = setup_env();
+    let depositor = Address::generate(&env);
+    let token = Address::generate(&env);
+    let mut signers = Vec::new(&env);
+    signers.push_back(admin.clone());
+
+    client.initialize(&admin, &signers, &1);
+
+    let initial_balance = client.get_balance(&token);
+    assert_eq!(initial_balance, 0);
+
+    client.deposit(&depositor, &token, &1000_i128);
+
+    let new_balance = client.get_balance(&token);
+    assert_eq!(new_balance, 1000);
+}

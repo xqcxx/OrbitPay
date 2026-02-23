@@ -1,5 +1,5 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Vec};
+use soroban_sdk::{contract, contractimpl, symbol_short, token, Address, Env, Symbol, Vec};
 
 mod errors;
 mod storage;
@@ -44,11 +44,9 @@ impl TreasuryContract {
         set_proposal_count(&env, 0);
 
         env.events().publish(
-            (symbol_short!("TreasuryDeposit"),),
-            TreasuryDepositEvent {
-                depositor: from.clone(),
-                token: _token,
-                amount,
+            (symbol_short!("TreasuryInitialized"),),
+            TreasuryInitializedEvent {
+                admin: admin.clone(),
             },
         );
 
@@ -60,7 +58,7 @@ impl TreasuryContract {
     pub fn deposit(
         env: Env,
         from: Address,
-        _token: Address,
+        token: Address,
         amount: i128,
     ) -> Result<(), TreasuryError> {
         if !has_admin(&env) {
@@ -72,13 +70,17 @@ impl TreasuryContract {
 
         from.require_auth();
 
-        // Transfer tokens from depositor to this contract
-        let _contract_address = env.current_contract_address();
-        // TODO: Invoke token contract transfer (contributor task SC-4)
-        // token::Client::new(&env, &token).transfer(&from, &contract_address, &amount);
+        let contract_address = env.current_contract_address();
+        token::Client::new(&env, &token).transfer(&from, &contract_address, &amount);
 
-        env.events()
-            .publish((symbol_short!("deposit"), from.clone()), amount);
+        env.events().publish(
+            (symbol_short!("TreasuryDeposit"),),
+            TreasuryDepositEvent {
+                depositor: from.clone(),
+                token,
+                amount,
+            },
+        );
 
         Ok(())
     }
@@ -439,6 +441,15 @@ impl TreasuryContract {
             return Err(TreasuryError::NotInitialized);
         }
         Ok(get_proposal_count(&env))
+    }
+
+    /// Get the treasury's balance for a specific token.
+    pub fn get_balance(env: Env, token: Address) -> Result<i128, TreasuryError> {
+        if !has_admin(&env) {
+            return Err(TreasuryError::NotInitialized);
+        }
+        let contract_address = env.current_contract_address();
+        Ok(token::Client::new(&env, &token).balance(&contract_address))
     }
 
     /// Upgrade the contract WASM. Restricted to admin.
