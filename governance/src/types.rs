@@ -51,11 +51,11 @@ pub struct Proposal {
     /// The recipient of funds if approved.
     pub recipient: Address,
     /// Votes in favor.
-    pub yes_votes: u32,
+    pub yes_votes: u128,
     /// Votes against.
-    pub no_votes: u32,
+    pub no_votes: u128,
     /// Abstaining votes.
-    pub abstain_votes: u32,
+    pub abstain_votes: u128,
     /// List of all vote records.
     pub votes: Vec<VoteRecord>,
     /// Current status.
@@ -70,10 +70,12 @@ pub struct Proposal {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GovernanceConfig {
-    /// Minimum percentage of members that must vote for the proposal to be valid (0-100).
+    /// Minimum percentage of total voting weight that must vote for the proposal to be valid (0-100).
     pub quorum_percentage: u32,
     /// Duration of the voting window in seconds.
     pub voting_duration: u64,
     /// Total number of DAO members.
     pub member_count: u32,
+    /// Total voting weight of all members.
+    pub total_weight: u128,
 }
