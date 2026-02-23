@@ -95,6 +95,7 @@ impl VestingContract {
             label,
             status: VestingStatus::Active,
             revocable,
+            revoked_at: None,
         };
 
         let token_client = token::Client::new(&env, &token);
@@ -199,6 +200,7 @@ impl VestingContract {
 
         schedule.status = VestingStatus::Revoked;
         schedule.total_amount = vested; // Cap at vested amount
+        schedule.revoked_at = Some(env.ledger().timestamp());
 
         if unvested > 0 {
             let token_client = token::Client::new(&env, &schedule.token);
@@ -211,7 +213,7 @@ impl VestingContract {
         set_schedule(&env, schedule_id, &schedule);
 
         env.events().publish(
-            (symbol_short!("v_revoke"), grantor.clone()),
+            (symbol_short!("v_revoke"), grantor.clone(), schedule_id),
             unvested,
         );
 

@@ -426,6 +426,12 @@
                     },
                     {
                       "key": {
+                        "symbol": "revoked_at"
+                      },
+                      "val": "void"
+                    },
+                    {
+                      "key": {
                         "symbol": "start_time"
                       },
                       "val": {
