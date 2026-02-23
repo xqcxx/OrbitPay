@@ -111,8 +111,8 @@ impl VestingContract {
         add_beneficiary_schedule(&env, &beneficiary, schedule_id);
 
         env.events().publish(
-            (symbol_short!("v_create"), grantor.clone()),
-            schedule_id,
+            (symbol_short!("v_create"), grantor.clone(), beneficiary.clone()),
+            (total_amount, cliff_duration, total_duration),
         );
 
         Ok(schedule_id)
@@ -148,8 +148,10 @@ impl VestingContract {
 
         schedule.claimed_amount += claimable;
 
+        let mut is_fully_claimed = false;
         if schedule.claimed_amount >= schedule.total_amount {
             schedule.status = VestingStatus::FullyClaimed;
+            is_fully_claimed = true;
         }
 
         let token_client = token::Client::new(&env, &schedule.token);
@@ -163,9 +165,16 @@ impl VestingContract {
         add_claim_record(&env, schedule_id, claimable, env.ledger().timestamp());
 
         env.events().publish(
-            (symbol_short!("v_claim"), beneficiary.clone()),
+            (symbol_short!("v_claim"), beneficiary.clone(), schedule_id),
             claimable,
         );
+
+        if is_fully_claimed {
+            env.events().publish(
+                (symbol_short!("v_fully"), schedule_id),
+                (),
+            );
+        }
 
         Ok(claimable)
     }
