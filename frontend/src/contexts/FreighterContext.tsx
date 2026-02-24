@@ -7,6 +7,7 @@ interface FreighterContextType {
     publicKey: string | null;
     isConnected: boolean;
     isLoading: boolean;
+    error: string | null;
     connectWallet: () => Promise<void>;
     disconnectWallet: () => void;
     checkConnection: () => Promise<void>;
@@ -18,6 +19,7 @@ export function FreighterProvider({ children }: { children: ReactNode }) {
     const [publicKey, setPublicKey] = useState<string | null>(null);
     const [isConnected, setIsConnected] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string | null>(null);
 
     const checkConnection = useCallback(async () => {
         setIsLoading(true);
@@ -33,8 +35,9 @@ export function FreighterProvider({ children }: { children: ReactNode }) {
                 setIsConnected(false);
                 setPublicKey(null);
             }
-        } catch (error) {
-            console.error("Error checking Freighter connection", error);
+        } catch (err: any) {
+            console.error("Error checking Freighter connection", err);
+            setError(err?.message || "Failed to check Freighter connection.");
         } finally {
             setIsLoading(false);
         }
@@ -46,15 +49,17 @@ export function FreighterProvider({ children }: { children: ReactNode }) {
 
     const connectWallet = async () => {
         setIsLoading(true);
+        setError(null);
         try {
             const access = await requestAccess();
             if (access) {
                 await checkConnection();
             } else {
-                console.warn("User aborted connection or Freighter is not installed.");
+                setError("Connection aborted or Freighter not installed.");
             }
-        } catch (error) {
-            console.error("Error connecting to Freighter", error);
+        } catch (err: any) {
+            console.error("Error connecting to Freighter", err);
+            setError(err?.message || "Failed to prompt connection request.");
         } finally {
             setIsLoading(false);
         }
@@ -63,6 +68,7 @@ export function FreighterProvider({ children }: { children: ReactNode }) {
     const disconnectWallet = () => {
         setPublicKey(null);
         setIsConnected(false);
+        setError(null);
     };
 
     return (
@@ -71,6 +77,7 @@ export function FreighterProvider({ children }: { children: ReactNode }) {
                 publicKey,
                 isConnected,
                 isLoading,
+                error,
                 connectWallet,
                 disconnectWallet,
                 checkConnection,
