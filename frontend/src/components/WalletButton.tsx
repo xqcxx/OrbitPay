@@ -14,7 +14,7 @@
 export default function WalletButton() {
   // TODO: Implement wallet connection states (contributor task FE-3)
   return (
-    <button className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-medium transition-colors">
+    <button className="rounded-lg bg-sky-500 px-4 py-2 font-medium text-slate-950 transition-colors hover:bg-sky-400">
       Connect Wallet
     </button>
   )
