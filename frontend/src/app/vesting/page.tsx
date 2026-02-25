@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import ClaimModal from '@/components/ClaimModal';
+import VestingTimeline from '@/components/VestingTimeline';
 import { CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface MockSchedule {
@@ -13,6 +14,12 @@ interface MockSchedule {
   claimable_amount: string;
   token: string;
   status: string;
+  startTime: number;
+  cliffDuration: number;
+  totalDuration: number;
+  totalAmountBig: bigint;
+  vestedAmountBig: bigint;
+  claimedAmountBig: bigint;
 }
 
 const MOCK_SCHEDULES: MockSchedule[] = [
@@ -24,7 +31,13 @@ const MOCK_SCHEDULES: MockSchedule[] = [
     claimed_amount: "2,000",
     claimable_amount: "4,000",
     token: "ORBT",
-    status: "Active"
+    status: "Active",
+    startTime: Math.floor(Date.now() / 1000) - 3600 * 24 * 365, // 1 year ago
+    cliffDuration: 3600 * 24 * 365, // 1 year
+    totalDuration: 3600 * 24 * 365 * 4, // 4 years
+    totalAmountBig: BigInt(100000000000),
+    vestedAmountBig: BigInt(60000000000),
+    claimedAmountBig: BigInt(20000000000),
   },
   {
     id: 2,
@@ -34,7 +47,13 @@ const MOCK_SCHEDULES: MockSchedule[] = [
     claimed_amount: "0",
     claimable_amount: "0",
     token: "ORBT",
-    status: "Cliff Period"
+    status: "Cliff Period",
+    startTime: Math.floor(Date.now() / 1000) - 3600 * 24 * 30, // 30 days ago
+    cliffDuration: 3600 * 24 * 180, // 6 months
+    totalDuration: 3600 * 24 * 365 * 2, // 2 years
+    totalAmountBig: BigInt(50000000000),
+    vestedAmountBig: BigInt(0),
+    claimedAmountBig: BigInt(0),
   }
 ];
 
@@ -83,7 +102,16 @@ export default function VestingPage() {
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-6">
+              <VestingTimeline
+                startTime={schedule.startTime}
+                cliffDuration={schedule.cliffDuration}
+                totalDuration={schedule.totalDuration}
+                totalAmount={schedule.totalAmountBig}
+                vestedAmount={schedule.vestedAmountBig}
+                claimedAmount={schedule.claimedAmountBig}
+              />
+
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Claimable</span>
                 <span className="text-purple-400 font-bold">{schedule.claimable_amount} {schedule.token}</span>
