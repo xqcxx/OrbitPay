@@ -11,6 +11,8 @@ pub enum DataKey {
     Proposal(u32),
     QuorumPercentage,
     VotingDuration,
+    VotingWeight(Address),
+    TotalWeight,
 }
 
 // ── Admin helpers ────────────────────────────────────────────────
@@ -45,6 +47,24 @@ pub fn is_member(env: &Env, address: &Address) -> bool {
         }
     }
     false
+}
+
+// ── Weight helpers ───────────────────────────────────────────────
+
+pub fn get_voting_weight(env: &Env, address: &Address) -> u128 {
+    env.storage().persistent().get(&DataKey::VotingWeight(address.clone())).unwrap_or(1)
+}
+
+pub fn set_voting_weight(env: &Env, address: &Address, weight: u128) {
+    env.storage().persistent().set(&DataKey::VotingWeight(address.clone()), &weight);
+}
+
+pub fn get_total_weight(env: &Env) -> u128 {
+    env.storage().instance().get(&DataKey::TotalWeight).unwrap_or(0)
+}
+
+pub fn set_total_weight(env: &Env, weight: u128) {
+    env.storage().instance().set(&DataKey::TotalWeight, &weight);
 }
 
 // ── Proposal helpers ─────────────────────────────────────────────

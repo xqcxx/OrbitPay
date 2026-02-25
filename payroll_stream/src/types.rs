@@ -41,6 +41,10 @@ pub struct PayrollStream {
     pub status: StreamStatus,
     /// Rate of tokens per second (total_amount / duration).
     pub rate_per_second: i128,
+    /// Timestamp when the stream was paused (None if not paused).
+    pub paused_at: Option<u64>,
+    /// Total duration the stream has been paused.
+    pub total_paused_duration: u64,
 }
 
 /// Summary view for listing streams without full details.

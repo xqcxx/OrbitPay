@@ -151,6 +151,21 @@
                         "key": {
                           "vec": [
                             {
+                              "symbol": "TotalWeight"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "u128": {
+                            "hi": 0,
+                            "lo": 2
+                          }
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
                               "symbol": "VotingDuration"
                             }
                           ]

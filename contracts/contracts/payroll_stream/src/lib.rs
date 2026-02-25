@@ -1,5 +1,5 @@
 #![no_std]
-use soroban_sdk::{contract, contractimpl, Address, Env, Vec, symbol_short, token};
+use soroban_sdk::{contract, contractimpl, symbol_short, token, Address, Env, Vec};
 
 mod errors;
 mod storage;
@@ -7,11 +7,10 @@ mod types;
 
 use errors::StreamError;
 use storage::{
-    get_admin, has_admin, set_admin, get_stream_count, set_stream_count,
-    get_stream, set_stream, add_sender_stream, add_recipient_stream,
-    get_sender_streams, get_recipient_streams,
+    add_recipient_stream, add_sender_stream, get_admin, get_recipient_streams, get_sender_streams,
+    get_stream, get_stream_count, has_admin, set_admin, set_stream, set_stream_count,
 };
-use types::{PayrollStream, StreamStatus, CreateStreamParams};
+use types::{CreateStreamParams, PayrollStream, StreamStatus};
 
 #[contract]
 pub struct PayrollStreamContract;
@@ -27,10 +26,8 @@ impl PayrollStreamContract {
         set_admin(&env, &admin);
         set_stream_count(&env, 0);
 
-        env.events().publish(
-            (symbol_short!("init"),),
-            admin.clone(),
-        );
+        env.events()
+            .publish((symbol_short!("init"),), admin.clone());
 
         Ok(())
     }
@@ -66,6 +63,14 @@ impl PayrollStreamContract {
 
         let duration = end_time - start_time;
         let rate_per_second = total_amount / (duration as i128);
+        let contract_address = env.current_contract_address();
+        let token_client = token::Client::new(&env, &token);
+
+        if token_client.balance(&sender) < total_amount {
+            return Err(StreamError::InsufficientBalance);
+        }
+
+        token_client.transfer(&sender, &contract_address, &total_amount);
 
         token::Client::new(&env, &token).transfer(&sender, &env.current_contract_address(), &total_amount);
 
@@ -74,7 +79,7 @@ impl PayrollStreamContract {
             id: stream_id,
             sender: sender.clone(),
             recipient: recipient.clone(),
-            token,
+            token: token.clone(),
             total_amount,
             claimed_amount: 0,
             start_time,
@@ -89,10 +94,8 @@ impl PayrollStreamContract {
         add_sender_stream(&env, &sender, stream_id);
         add_recipient_stream(&env, &recipient, stream_id);
 
-        env.events().publish(
-            (symbol_short!("s_create"), sender.clone()),
-            stream_id,
-        );
+        env.events()
+            .publish((symbol_short!("s_create"), sender.clone()), stream_id);
 
         Ok(stream_id)
     }
@@ -152,11 +155,13 @@ impl PayrollStreamContract {
                 rate_per_second,
             };
 
+            // TODO: Transfer total_amount from sender to contract (batch transfer optimization possible)
+
             
             set_stream(&env, stream_id, &stream);
             add_sender_stream(&env, &sender, stream_id);
             add_recipient_stream(&env, &recipient, stream_id);
-            
+
             stream_ids.push_back(stream_id);
             count += 1;
         }
@@ -179,8 +184,7 @@ impl PayrollStreamContract {
         }
         recipient.require_auth();
 
-        let mut stream = get_stream(&env, stream_id)
-            .ok_or(StreamError::StreamNotFound)?;
+        let mut stream = get_stream(&env, stream_id).ok_or(StreamError::StreamNotFound)?;
 
         if stream.recipient != recipient {
             return Err(StreamError::Unauthorized);
@@ -192,14 +196,31 @@ impl PayrollStreamContract {
             return Err(StreamError::StreamCompleted);
         }
 
-        let claimable = Self::calculate_claimable(&env, &stream);
+        let claimable = Self::calculate_claimable(&env, &stream)?;
         if claimable <= 0 {
             return Err(StreamError::NothingToClaim);
         }
 
-        stream.claimed_amount += claimable;
+        let contract_address = env.current_contract_address();
+        let token_client = token::Client::new(&env, &stream.token);
+        if token_client.balance(&contract_address) < claimable {
+            return Err(StreamError::InsufficientBalance);
+        }
+
+        stream.claimed_amount = stream
+            .claimed_amount
+            .checked_add(claimable)
+            .ok_or(StreamError::ArithmeticError)?;
+        if stream.claimed_amount > stream.total_amount {
+            return Err(StreamError::ArithmeticError);
+        }
+
         let now = env.ledger().timestamp();
-        stream.last_claim_time = now;
+        stream.last_claim_time = if now > stream.end_time {
+            stream.end_time
+        } else {
+            now
+        };
 
         // Check if stream is fully claimed
         if stream.claimed_amount >= stream.total_amount {
@@ -210,29 +231,23 @@ impl PayrollStreamContract {
             .transfer(&env.current_contract_address(), &recipient, &claimable);
 
         set_stream(&env, stream_id, &stream);
+        token_client.transfer(&contract_address, &recipient, &claimable);
 
-        env.events().publish(
-            (symbol_short!("claim"), recipient.clone()),
-            claimable,
-        );
+        env.events()
+            .publish((symbol_short!("claim"), recipient.clone()), claimable);
 
         Ok(claimable)
     }
 
     /// Cancel a stream. Only the sender (organization) can cancel.
     /// Unclaimed tokens are returned to the sender. Already-claimed tokens stay with recipient.
-    pub fn cancel_stream(
-        env: Env,
-        sender: Address,
-        stream_id: u32,
-    ) -> Result<(), StreamError> {
+    pub fn cancel_stream(env: Env, sender: Address, stream_id: u32) -> Result<(), StreamError> {
         if !has_admin(&env) {
             return Err(StreamError::NotInitialized);
         }
         sender.require_auth();
 
-        let mut stream = get_stream(&env, stream_id)
-            .ok_or(StreamError::StreamNotFound)?;
+        let mut stream = get_stream(&env, stream_id).ok_or(StreamError::StreamNotFound)?;
 
         if stream.sender != sender {
             return Err(StreamError::Unauthorized);
@@ -240,31 +255,50 @@ impl PayrollStreamContract {
         if stream.status == StreamStatus::Cancelled {
             return Err(StreamError::StreamAlreadyCancelled);
         }
-        if stream.status == StreamStatus::Completed {
-            return Err(StreamError::StreamCompleted);
-        }
 
-        // Calculate what recipient is owed up to now
-        let claimable = Self::calculate_claimable(&env, &stream);
-        let refund = stream.total_amount - stream.claimed_amount - claimable;
+        let owed_to_recipient = Self::calculate_claimable(&env, &stream)?;
+        let remaining_in_contract = stream
+            .total_amount
+            .checked_sub(stream.claimed_amount)
+            .ok_or(StreamError::ArithmeticError)?;
+        let refund_to_sender = remaining_in_contract
+            .checked_sub(owed_to_recipient)
+            .ok_or(StreamError::ArithmeticError)?;
+        let total_settlement = owed_to_recipient
+            .checked_add(refund_to_sender)
+            .ok_or(StreamError::ArithmeticError)?;
 
-        stream.status = StreamStatus::Cancelled;
         let contract_addr = env.current_contract_address();
         let token_client = token::Client::new(&env, &stream.token);
-
-        if claimable > 0 {
-            token_client.transfer(&contract_addr, &stream.recipient, &claimable);
-        }
-        if refund > 0 {
-            token_client.transfer(&contract_addr, &sender, &refund);
+        if token_client.balance(&contract_addr) < total_settlement {
+            return Err(StreamError::InsufficientBalance);
         }
 
+        stream.claimed_amount = stream
+            .claimed_amount
+            .checked_add(owed_to_recipient)
+            .ok_or(StreamError::ArithmeticError)?;
+        if stream.claimed_amount > stream.total_amount {
+            return Err(StreamError::ArithmeticError);
+        }
+        let now = env.ledger().timestamp();
+        stream.last_claim_time = if now > stream.end_time {
+            stream.end_time
+        } else {
+            now
+        };
+        stream.status = StreamStatus::Cancelled;
         set_stream(&env, stream_id, &stream);
 
-        env.events().publish(
-            (symbol_short!("cancel"), sender.clone()),
-            stream_id,
-        );
+        if owed_to_recipient > 0 {
+            token_client.transfer(&contract_addr, &stream.recipient, &owed_to_recipient);
+        }
+        if refund_to_sender > 0 {
+            token_client.transfer(&contract_addr, &sender, &refund_to_sender);
+        }
+
+        env.events()
+            .publish((symbol_short!("cancel"), sender.clone()), stream_id);
 
         Ok(())
     }
@@ -272,11 +306,11 @@ impl PayrollStreamContract {
     // ── Internal Helpers ─────────────────────────────────────────
 
     /// Calculate the amount of tokens claimable by the recipient at the current time.
-    fn calculate_claimable(env: &Env, stream: &PayrollStream) -> i128 {
+    fn calculate_claimable(env: &Env, stream: &PayrollStream) -> Result<i128, StreamError> {
         let now = env.ledger().timestamp();
 
         if now <= stream.start_time {
-            return 0;
+            return Ok(0);
         }
 
         let effective_time = if now >= stream.end_time {
@@ -288,13 +322,18 @@ impl PayrollStreamContract {
         let elapsed = effective_time - stream.start_time;
         // Check if stream is completed to avoid division by zero (though duration checked at creation)
         if stream.end_time <= stream.start_time {
-             return 0; 
+            return Err(StreamError::InvalidDuration);
         }
-        
+
         // Recalculate based on total amount and duration to minimize rounding errors
         // Instead of using stored rate_per_second which might have rounding loss
         let duration = stream.end_time - stream.start_time;
-        let total_accrued = (stream.total_amount * (elapsed as i128)) / (duration as i128);
+        let total_accrued = stream
+            .total_amount
+            .checked_mul(elapsed as i128)
+            .ok_or(StreamError::ArithmeticError)?
+            .checked_div(duration as i128)
+            .ok_or(StreamError::ArithmeticError)?;
 
         // Clamp to total_amount
         let total_accrued = if total_accrued > stream.total_amount {
@@ -302,13 +341,15 @@ impl PayrollStreamContract {
         } else {
             total_accrued
         };
-        
-        // Ensure we don't return negative claimable if something is wrong with state
+
+        // Avoid underflow if stream state is inconsistent.
         if total_accrued < stream.claimed_amount {
-            return 0;
+            return Err(StreamError::ArithmeticError);
         }
 
-        total_accrued - stream.claimed_amount
+        total_accrued
+            .checked_sub(stream.claimed_amount)
+            .ok_or(StreamError::ArithmeticError)
     }
 
     // ── Query Functions ──────────────────────────────────────────
@@ -320,9 +361,8 @@ impl PayrollStreamContract {
 
     /// Get the claimable balance for a stream at the current time.
     pub fn get_claimable(env: Env, stream_id: u32) -> Result<i128, StreamError> {
-        let stream = get_stream(&env, stream_id)
-            .ok_or(StreamError::StreamNotFound)?;
-        Ok(Self::calculate_claimable(&env, &stream))
+        let stream = get_stream(&env, stream_id).ok_or(StreamError::StreamNotFound)?;
+        Self::calculate_claimable(&env, &stream)
     }
 
     /// Get the total number of streams created.
@@ -349,7 +389,11 @@ impl PayrollStreamContract {
     }
 
     /// Upgrade the contract WASM. Restricted to admin.
-    pub fn upgrade(env: Env, admin: Address, new_wasm_hash: soroban_sdk::BytesN<32>) -> Result<(), StreamError> {
+    pub fn upgrade(
+        env: Env,
+        admin: Address,
+        new_wasm_hash: soroban_sdk::BytesN<32>,
+    ) -> Result<(), StreamError> {
         let stored_admin = get_admin(&env);
         if admin != stored_admin {
             return Err(StreamError::Unauthorized);

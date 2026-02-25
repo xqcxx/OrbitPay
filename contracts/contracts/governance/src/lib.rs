@@ -11,6 +11,7 @@ use storage::{
     get_proposal_count, set_proposal_count, get_proposal, set_proposal,
     get_quorum_percentage, set_quorum_percentage, get_voting_duration, set_voting_duration,
     get_grace_period, set_grace_period,
+    get_total_weight, set_total_weight, get_voting_weight, set_voting_weight,
 };
 use types::{Proposal, ProposalStatus, VoteChoice, VoteRecord, GovernanceConfig};
 
@@ -45,6 +46,9 @@ impl GovernanceContract {
         set_voting_duration(&env, voting_duration);
         set_grace_period(&env, grace_period);
         set_proposal_count(&env, 0);
+
+        // Default weight is 1 for each initial member
+        set_total_weight(&env, members.len() as u128);
 
         env.events().publish(
             (symbol_short!("init"),),
@@ -144,11 +148,12 @@ impl GovernanceContract {
             }
         }
 
-        // Record the vote
+        // Record the vote using member's weight
+        let weight = get_voting_weight(&env, &voter);
         match choice {
-            VoteChoice::Yes => proposal.yes_votes += 1,
-            VoteChoice::No => proposal.no_votes += 1,
-            VoteChoice::Abstain => proposal.abstain_votes += 1,
+            VoteChoice::Yes => proposal.yes_votes += weight,
+            VoteChoice::No => proposal.no_votes += weight,
+            VoteChoice::Abstain => proposal.abstain_votes += weight,
         }
 
         proposal.votes.push_back(VoteRecord {
@@ -191,13 +196,13 @@ impl GovernanceContract {
             return Err(GovernanceError::ProposalStillActive);
         }
 
-        let members = get_members(&env);
         let quorum_pct = get_quorum_percentage(&env);
-        let total_votes = proposal.yes_votes + proposal.no_votes + proposal.abstain_votes;
+        let total_weight = get_total_weight(&env);
+        let voted_weight = proposal.yes_votes + proposal.no_votes + proposal.abstain_votes;
 
-        // Check quorum: enough members voted?
-        let quorum_threshold = (members.len() * quorum_pct) / 100;
-        if total_votes < quorum_threshold {
+        // Check quorum: enough voting weight represented?
+        let quorum_threshold = (total_weight * quorum_pct as u128) / 100;
+        if voted_weight < quorum_threshold {
             proposal.status = ProposalStatus::Rejected;
             set_proposal(&env, proposal_id, &proposal);
             return Ok(ProposalStatus::Rejected);
@@ -315,6 +320,10 @@ impl GovernanceContract {
         members.push_back(new_member.clone());
         set_members(&env, &members);
 
+        // New members start with weight 1
+        let total_weight = get_total_weight(&env);
+        set_total_weight(&env, total_weight + 1);
+
         env.events().publish(
             (symbol_short!("m_add"),),
             new_member,
@@ -349,9 +358,45 @@ impl GovernanceContract {
 
         set_members(&env, &new_members);
 
+        // Adjust total weight
+        let weight = get_voting_weight(&env, &member);
+        let total_weight = get_total_weight(&env);
+        set_total_weight(&env, total_weight - weight);
+
         env.events().publish(
             (symbol_short!("m_remove"),),
             member,
+        );
+
+        Ok(())
+    }
+
+    /// Set a custom voting weight for a member. Restricted to admin.
+    pub fn set_voting_weight(
+        env: Env,
+        admin: Address,
+        member: Address,
+        new_weight: u128,
+    ) -> Result<(), GovernanceError> {
+        let stored_admin = get_admin(&env);
+        if admin != stored_admin {
+            return Err(GovernanceError::Unauthorized);
+        }
+        admin.require_auth();
+
+        if !is_member(&env, &member) {
+            return Err(GovernanceError::NotAMember);
+        }
+
+        let old_weight = get_voting_weight(&env, &member);
+        let total_weight = get_total_weight(&env);
+
+        set_voting_weight(&env, &member, new_weight);
+        set_total_weight(&env, total_weight - old_weight + new_weight);
+
+        env.events().publish(
+            (symbol_short!("w_set"), member),
+            new_weight,
         );
 
         Ok(())
@@ -385,6 +430,7 @@ impl GovernanceContract {
             voting_duration: get_voting_duration(&env),
             grace_period: get_grace_period(&env),
             member_count: members.len(),
+            total_weight: get_total_weight(&env),
         })
     }
 

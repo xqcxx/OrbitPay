@@ -47,6 +47,8 @@ pub struct VestingSchedule {
     pub status: VestingStatus,
     /// Whether the schedule is revocable by the grantor.
     pub revocable: bool,
+    /// Unix timestamp when the schedule was revoked, if applicable.
+    pub revoked_at: Option<u64>,
 }
 
 /// Summary view of vesting progress.

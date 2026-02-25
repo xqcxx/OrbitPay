@@ -1,4 +1,4 @@
-use soroban_sdk::{contracterror};
+use soroban_sdk::contracterror;
 
 /// Error codes for the Payroll Stream contract.
 #[contracterror]
@@ -27,4 +27,8 @@ pub enum StreamError {
     InvalidStartTime = 10,
     /// The recipient address is invalid or same as sender.
     InvalidRecipient = 11,
+    /// The token balance is insufficient for the requested transfer.
+    InsufficientBalance = 12,
+    /// Arithmetic overflow/underflow occurred while computing stream amounts.
+    ArithmeticError = 13,
 }
