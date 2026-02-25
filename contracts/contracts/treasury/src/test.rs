@@ -30,6 +30,24 @@ fn test_initialize() {
 }
 
 #[test]
+fn test_get_config() {
+    let (env, admin, client) = setup_env();
+    let signer1 = Address::generate(&env);
+    let signer2 = Address::generate(&env);
+    let mut signers = Vec::new(&env);
+    signers.push_back(signer1.clone());
+    signers.push_back(signer2.clone());
+
+    client.initialize(&admin, &signers, &2);
+
+    let config = client.get_config();
+    assert_eq!(config.admin, admin);
+    assert_eq!(config.signers, signers);
+    assert_eq!(config.threshold, 2);
+    assert_eq!(config.proposal_count, 0);
+}
+
+#[test]
 #[should_panic]
 fn test_double_initialize() {
     let (env, admin, client) = setup_env();

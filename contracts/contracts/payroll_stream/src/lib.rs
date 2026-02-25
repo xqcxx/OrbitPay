@@ -57,6 +57,9 @@ impl PayrollStreamContract {
         if end_time <= start_time {
             return Err(StreamError::InvalidDuration);
         }
+        if start_time < env.ledger().timestamp() {
+            return Err(StreamError::InvalidStartTime);
+        }
 
         let duration = end_time - start_time;
         let rate_per_second = total_amount / (duration as i128);
@@ -68,6 +71,8 @@ impl PayrollStreamContract {
         }
 
         token_client.transfer(&sender, &contract_address, &total_amount);
+
+        token::Client::new(&env, &token).transfer(&sender, &env.current_contract_address(), &total_amount);
 
         let stream_id = get_stream_count(&env);
         let stream = PayrollStream {
@@ -126,10 +131,15 @@ impl PayrollStreamContract {
             if end_time <= start_time {
                 return Err(StreamError::InvalidDuration);
             }
+            if start_time < env.ledger().timestamp() {
+                return Err(StreamError::InvalidStartTime);
+            }
 
             let duration = end_time - start_time;
             let rate_per_second = total_amount / (duration as i128);
 
+            token::Client::new(&env, &token).transfer(&sender, &env.current_contract_address(), &total_amount);
+            
             let stream_id = count;
             let stream = PayrollStream {
                 id: stream_id,
@@ -147,6 +157,7 @@ impl PayrollStreamContract {
 
             // TODO: Transfer total_amount from sender to contract (batch transfer optimization possible)
 
+            
             set_stream(&env, stream_id, &stream);
             add_sender_stream(&env, &sender, stream_id);
             add_recipient_stream(&env, &recipient, stream_id);
@@ -215,6 +226,9 @@ impl PayrollStreamContract {
         if stream.claimed_amount >= stream.total_amount {
             stream.status = StreamStatus::Completed;
         }
+
+        token::Client::new(&env, &stream.token)
+            .transfer(&env.current_contract_address(), &recipient, &claimable);
 
         set_stream(&env, stream_id, &stream);
         token_client.transfer(&contract_address, &recipient, &claimable);

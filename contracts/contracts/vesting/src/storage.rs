@@ -1,6 +1,6 @@
 use soroban_sdk::{contracttype, Address, Env, Vec};
 
-use crate::types::VestingSchedule;
+use crate::types::{VestingSchedule, ClaimRecord};
 
 /// Keys used to store data in the contract's ledger storage.
 #[contracttype]
@@ -10,6 +10,7 @@ pub enum DataKey {
     Schedule(u32),
     GrantorSchedules(Address),
     BeneficiarySchedules(Address),
+    ClaimHistory(u32),
 }
 
 // ── Admin helpers ────────────────────────────────────────────────
@@ -76,4 +77,21 @@ pub fn add_beneficiary_schedule(env: &Env, beneficiary: &Address, schedule_id: u
     env.storage()
         .persistent()
         .set(&DataKey::BeneficiarySchedules(beneficiary.clone()), &schedules);
+}
+
+// ── Claim history helpers ────────────────────────────────────────
+
+pub fn get_claim_history(env: &Env, schedule_id: u32) -> Vec<ClaimRecord> {
+    env.storage()
+        .persistent()
+        .get(&DataKey::ClaimHistory(schedule_id))
+        .unwrap_or(Vec::new(env))
+}
+
+pub fn add_claim_record(env: &Env, schedule_id: u32, amount: i128, timestamp: u64) {
+    let mut history = get_claim_history(env, schedule_id);
+    history.push_back(ClaimRecord { amount, timestamp });
+    env.storage()
+        .persistent()
+        .set(&DataKey::ClaimHistory(schedule_id), &history);
 }

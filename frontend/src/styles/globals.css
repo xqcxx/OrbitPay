@@ -3,17 +3,48 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 13, 17, 23;
-  --background-end-rgb: 22, 27, 34;
+  --background: 247 249 252;
+  --background-end: 226 232 240;
+  --spotlight: 56 189 248;
+  --foreground: 15 23 42;
+  --muted: 226 232 240;
+  --muted-foreground: 71 85 105;
+  --surface: 255 255 255;
+  --border: 203 213 225;
+  --accent: 56 189 248;
+}
+
+.dark {
+  --background: 2 6 23;
+  --background-end: 15 23 42;
+  --spotlight: 14 116 144;
+  --foreground: 241 245 249;
+  --muted: 15 23 42;
+  --muted-foreground: 148 163 184;
+  --surface: 15 23 42;
+  --border: 30 41 59;
+  --accent: 56 189 248;
+}
+
+* {
+  border-color: rgb(var(--border));
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-    to bottom,
-    rgb(var(--background-start-rgb)),
-    rgb(var(--background-end-rgb))
-  );
-  font-family: 'Inter', system-ui, sans-serif;
+  color: rgb(var(--foreground));
+  background:
+    radial-gradient(
+      circle at top right,
+      rgb(var(--spotlight) / 0.35),
+      transparent 35%
+    ),
+    linear-gradient(
+      180deg,
+      rgb(var(--background)),
+      rgb(var(--background-end))
+    );
+}
+
+a {
+  @apply transition-colors;
 }

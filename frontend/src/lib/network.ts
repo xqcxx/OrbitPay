@@ -1,7 +1,4 @@
-/**
- * Stellar/Soroban network configuration.
- * Contributors: see FE-4 for full implementation.
- */
+import { rpc } from '@stellar/stellar-sdk';
 
 import { Server } from "@stellar/stellar-sdk";
 
@@ -12,10 +9,6 @@ export const NETWORK = {
 	horizonUrl: "https://horizon-testnet.stellar.org",
 } as const;
 
-/**
- * Contract IDs — these will be populated after deployment.
- * TODO: Add deployed contract IDs (contributor task FE-4)
- */
 export const CONTRACTS = {
 	treasury: "",
 	payrollStream:
