@@ -1,4 +1,5 @@
 import { PayrollAnalytics } from '@/components/PayrollAnalytics'
+import ActiveStreamsList from '@/components/ActiveStreamsList'
 
 export default function PayrollPage() {
   return (
@@ -9,6 +10,9 @@ export default function PayrollPage() {
       </p>
 
       <PayrollAnalytics />
+      <div className="mt-12">
+        <ActiveStreamsList />
+      </div>
     </div>
   )
 }
