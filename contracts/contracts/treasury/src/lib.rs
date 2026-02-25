@@ -9,14 +9,23 @@ use errors::TreasuryError;
 use storage::{
     get_admin, get_proposal_count, get_signers, get_threshold, get_withdrawal, has_admin,
     set_admin, set_proposal_count, set_signers, set_threshold, set_withdrawal,
+    extend_instance_ttl, extend_withdrawal_ttl,
 };
-use types::{WithdrawalRequest, WithdrawalStatus};
+use types::{TreasuryConfig, WithdrawalRequest, WithdrawalStatus};
 
 #[contract]
 pub struct TreasuryContract;
 
 #[contractimpl]
 impl TreasuryContract {
+    /// Internal helper to ensure the contract has been initialized.
+    fn require_initialized(env: &Env) -> Result<(), TreasuryError> {
+        if !has_admin(env) {
+            return Err(TreasuryError::NotInitialized);
+        }
+        Ok(())
+    }
+
     /// Initialize the treasury with an admin and initial set of signers.
     /// The threshold defines how many signers must approve a withdrawal.
     pub fn initialize(
@@ -39,6 +48,8 @@ impl TreasuryContract {
         set_threshold(&env, threshold);
         set_proposal_count(&env, 0);
 
+        extend_instance_ttl(&env);
+
         env.events()
             .publish((symbol_short!("init"),), admin.clone());
 
@@ -53,9 +64,7 @@ impl TreasuryContract {
         _token: Address,
         amount: i128,
     ) -> Result<(), TreasuryError> {
-        if !has_admin(&env) {
-            return Err(TreasuryError::NotInitialized);
-        }
+        Self::require_initialized(&env)?;
         if amount <= 0 {
             return Err(TreasuryError::InvalidAmount);
         }
@@ -83,9 +92,7 @@ impl TreasuryContract {
         amount: i128,
         memo: Symbol,
     ) -> Result<u32, TreasuryError> {
-        if !has_admin(&env) {
-            return Err(TreasuryError::NotInitialized);
-        }
+        Self::require_initialized(&env)?;
         proposer.require_auth();
 
         let signers = get_signers(&env);
@@ -122,6 +129,9 @@ impl TreasuryContract {
         set_withdrawal(&env, proposal_id, &request);
         set_proposal_count(&env, proposal_id + 1);
 
+        extend_instance_ttl(&env);
+        extend_withdrawal_ttl(&env, proposal_id);
+
         env.events()
             .publish((symbol_short!("w_create"), proposer.clone()), proposal_id);
 
@@ -135,9 +145,7 @@ impl TreasuryContract {
         signer: Address,
         proposal_id: u32,
     ) -> Result<(), TreasuryError> {
-        if !has_admin(&env) {
-            return Err(TreasuryError::NotInitialized);
-        }
+        Self::require_initialized(&env)?;
         signer.require_auth();
 
         // Verify signer is authorized
@@ -177,6 +185,8 @@ impl TreasuryContract {
 
         set_withdrawal(&env, proposal_id, &request);
 
+        extend_withdrawal_ttl(&env, proposal_id);
+
         env.events()
             .publish((symbol_short!("approve"), signer.clone()), proposal_id);
 
@@ -190,9 +200,7 @@ impl TreasuryContract {
         executor: Address,
         proposal_id: u32,
     ) -> Result<(), TreasuryError> {
-        if !has_admin(&env) {
-            return Err(TreasuryError::NotInitialized);
-        }
+        Self::require_initialized(&env)?;
         executor.require_auth();
 
         let mut request =
@@ -215,6 +223,8 @@ impl TreasuryContract {
         request.status = WithdrawalStatus::Executed;
         set_withdrawal(&env, proposal_id, &request);
 
+        extend_withdrawal_ttl(&env, proposal_id);
+
         env.events().publish(
             (symbol_short!("w_exec"), request.recipient.clone()),
             request.amount,
@@ -225,9 +235,7 @@ impl TreasuryContract {
 
     /// Add a new signer to the treasury. Restricted to admin.
     pub fn add_signer(env: Env, admin: Address, new_signer: Address) -> Result<(), TreasuryError> {
-        if !has_admin(&env) {
-            return Err(TreasuryError::NotInitialized);
-        }
+        Self::require_initialized(&env)?;
         let stored_admin = get_admin(&env);
         if admin != stored_admin {
             return Err(TreasuryError::Unauthorized);
@@ -243,6 +251,8 @@ impl TreasuryContract {
         signers.push_back(new_signer.clone());
         set_signers(&env, &signers);
 
+        extend_instance_ttl(&env);
+
         env.events().publish((symbol_short!("s_add"),), new_signer);
 
         Ok(())
@@ -251,9 +261,7 @@ impl TreasuryContract {
     /// Remove a signer from the treasury. Restricted to admin.
     /// Cannot remove if it would make threshold unachievable.
     pub fn remove_signer(env: Env, admin: Address, signer: Address) -> Result<(), TreasuryError> {
-        if !has_admin(&env) {
-            return Err(TreasuryError::NotInitialized);
-        }
+        Self::require_initialized(&env)?;
         let stored_admin = get_admin(&env);
         if admin != stored_admin {
             return Err(TreasuryError::Unauthorized);
@@ -284,6 +292,8 @@ impl TreasuryContract {
 
         set_signers(&env, &new_signers);
 
+        extend_instance_ttl(&env);
+
         env.events().publish((symbol_short!("s_remove"),), signer);
 
         Ok(())
@@ -295,9 +305,7 @@ impl TreasuryContract {
         admin: Address,
         new_threshold: u32,
     ) -> Result<(), TreasuryError> {
-        if !has_admin(&env) {
-            return Err(TreasuryError::NotInitialized);
-        }
+        Self::require_initialized(&env)?;
         let stored_admin = get_admin(&env);
         if admin != stored_admin {
             return Err(TreasuryError::Unauthorized);
@@ -311,6 +319,8 @@ impl TreasuryContract {
 
         set_threshold(&env, new_threshold);
 
+        extend_instance_ttl(&env);
+
         env.events()
             .publish((symbol_short!("t_upd"),), new_threshold);
 
@@ -321,25 +331,19 @@ impl TreasuryContract {
 
     /// Get the current admin address.
     pub fn get_admin(env: Env) -> Result<Address, TreasuryError> {
-        if !has_admin(&env) {
-            return Err(TreasuryError::NotInitialized);
-        }
+        Self::require_initialized(&env)?;
         Ok(get_admin(&env))
     }
 
     /// Get the list of current signers.
     pub fn get_signers(env: Env) -> Result<Vec<Address>, TreasuryError> {
-        if !has_admin(&env) {
-            return Err(TreasuryError::NotInitialized);
-        }
+        Self::require_initialized(&env)?;
         Ok(get_signers(&env))
     }
 
     /// Get the current approval threshold.
     pub fn get_threshold(env: Env) -> Result<u32, TreasuryError> {
-        if !has_admin(&env) {
-            return Err(TreasuryError::NotInitialized);
-        }
+        Self::require_initialized(&env)?;
         Ok(get_threshold(&env))
     }
 
@@ -350,10 +354,19 @@ impl TreasuryContract {
 
     /// Get the total number of withdrawal proposals created.
     pub fn get_proposal_count(env: Env) -> Result<u32, TreasuryError> {
-        if !has_admin(&env) {
-            return Err(TreasuryError::NotInitialized);
-        }
+        Self::require_initialized(&env)?;
         Ok(get_proposal_count(&env))
+    }
+
+    /// Get the full treasury configuration snapshot.
+    pub fn get_config(env: Env) -> Result<TreasuryConfig, TreasuryError> {
+        Self::require_initialized(&env)?;
+        Ok(TreasuryConfig {
+            admin: get_admin(&env),
+            signers: get_signers(&env),
+            threshold: get_threshold(&env),
+            proposal_count: get_proposal_count(&env),
+        })
     }
 
     /// Upgrade the contract WASM. Restricted to admin.

@@ -16,4 +16,5 @@ pub enum VestingError {
     CliffNotReached = 9,
     AlreadyFullyClaimed = 10,
     InvalidCliffDuration = 11,
+    InsufficientBalance = 12,
 }

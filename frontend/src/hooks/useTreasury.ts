@@ -156,8 +156,8 @@ export function useTreasury() {
   }, []);
 
   return {
-    signers: [],
-    threshold: 0,
+    signers,
+    threshold,
     proposals: [],
     isLoading,
     transactionHistory,

@@ -47,6 +47,8 @@ pub struct VestingSchedule {
     pub status: VestingStatus,
     /// Whether the schedule is revocable by the grantor.
     pub revocable: bool,
+    /// Unix timestamp when the schedule was revoked, if applicable.
+    pub revoked_at: Option<u64>,
 }
 
 /// Summary view of vesting progress.
@@ -58,4 +60,14 @@ pub struct VestingProgress {
     pub claimed_amount: i128,
     pub claimable_amount: i128,
     pub status: VestingStatus,
+}
+
+/// A record of a single claim event.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClaimRecord {
+    /// The amount of tokens claimed.
+    pub amount: i128,
+    /// Unix timestamp when the claim occurred.
+    pub timestamp: u64,
 }
