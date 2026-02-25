@@ -1,28 +1,31 @@
-/**
- * Freighter wallet utilities.
- * Contributors: see FE-2 for full implementation.
- */
+import {
+  isConnected,
+  getPublicKey,
+  signTransaction as freighterSign,
+} from '@stellar/freighter-api';
 
-/**
- * Check if Freighter wallet extension is installed.
- * TODO: Implement with @stellar/freighter-api (contributor task FE-2)
- */
 export async function isFreighterInstalled(): Promise<boolean> {
-  return false
+  return isConnected();
 }
 
-/**
- * Connect to Freighter and get the user's public key.
- * TODO: Implement with @stellar/freighter-api (contributor task FE-2)
- */
 export async function connectWallet(): Promise<string | null> {
-  return null
+  try {
+    const publicKey = await getPublicKey();
+    return publicKey;
+  } catch (error) {
+    console.error('Failed to connect wallet:', error);
+    return null;
+  }
 }
 
-/**
- * Sign a Soroban transaction XDR using Freighter.
- * TODO: Implement signing flow (contributor task FE-2)
- */
 export async function signTransaction(xdr: string, network: string): Promise<string> {
-  throw new Error('Not implemented — see FE-2')
+  try {
+    const signedXdr = await freighterSign(xdr, {
+      network,
+    });
+    return signedXdr;
+  } catch (error) {
+    console.error('Failed to sign transaction:', error);
+    throw error;
+  }
 }
