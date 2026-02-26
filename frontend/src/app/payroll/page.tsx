@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 import StreamCreationForm from "@/components/StreamCreationForm";
 
@@ -5,7 +7,7 @@ export default function PayrollPage() {
 	const [successMessage, setSuccessMessage] = useState<string>("");
 	const [errorMessage, setErrorMessage] = useState<string>("");
 
-	const handleStreamCreated = (streamId: number) => {
+	const handleStreamCreated = (streamId: string) => {
 		setSuccessMessage(`Stream created successfully! Stream ID: ${streamId}`);
 		setErrorMessage("");
 	};

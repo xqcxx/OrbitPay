@@ -16,7 +16,7 @@ interface StreamFormData {
 }
 
 interface StreamCreationFormProps {
-	onSuccess?: (streamId: number) => void;
+	onSuccess?: (streamId: string) => void;
 	onError?: (error: string) => void;
 }
 
