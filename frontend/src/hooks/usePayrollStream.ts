@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
 	Contract,
 	Address,
@@ -8,6 +8,7 @@ import {
 	nativeToScVal,
 	TransactionBuilder,
 	rpc,
+    xdr
 } from "@stellar/stellar-sdk";
 import { CONTRACTS, NETWORK, NETWORKS } from "@/lib/network";
 import { getSorobanServer } from "@/lib/soroban";
@@ -30,9 +31,9 @@ export interface Stream {
   sender: string
   recipient: string
   token: string
-  totalAmount: number
-  amountStreamed: number
-  ratePerSecond: number
+  totalAmount: string
+  amountStreamed: string
+  ratePerSecond: string
   startTime: number
   endTime: number
   status: StreamStatus
@@ -57,51 +58,129 @@ function decimalToI128(value: string): bigint {
 	return total;
 }
 
-// Mock Data for FE-12 Development
-const MOCK_STREAMS: Stream[] = [
-  {
-    id: 'stream-1',
-    sender: 'me',
-    recipient: 'G...ABCD',
-    token: 'USDC',
-    totalAmount: 5000,
-    amountStreamed: 2500,
-    ratePerSecond: 0.001,
-    startTime: Date.now() - 2500000,
-    endTime: Date.now() + 2500000,
-    status: 'Active',
-  },
-  {
-    id: 'stream-2',
-    sender: 'G...XYZ',
-    recipient: 'me',
-    token: 'XLM',
-    totalAmount: 10000,
-    amountStreamed: 10000,
-    ratePerSecond: 0.005,
-    startTime: Date.now() - 5000000,
-    endTime: Date.now() - 1000,
-    status: 'Completed',
-  },
-  {
-    id: 'stream-3',
-    sender: 'me',
-    recipient: 'G...789',
-    token: 'USDC',
-    totalAmount: 2000,
-    amountStreamed: 500,
-    ratePerSecond: 0.0005,
-    startTime: Date.now() - 1000000,
-    endTime: Date.now() + 3000000,
-    status: 'Paused',
-  }
-]
-
 /**
  * Hook to interact with the Payroll Stream contract.
  */
 export function usePayrollStream() {
 	const [isLoading, setIsLoading] = useState(false);
+    const [streams, setStreams] = useState<Stream[]>([]);
+
+    const fetchStreams = useCallback(async () => {
+        if (!CONTRACTS.payrollStream) return;
+
+        const server = getSorobanServer();
+        const contract = new Contract(CONTRACTS.payrollStream);
+
+        try {
+            const { Freighter } = await import("@stellar/freighter-api");
+            let publicKey: string;
+            try {
+                publicKey = await Freighter.getPublicKey();
+            } catch {
+                return;
+            }
+
+            const account = await server.getAccount(publicKey);
+            const builder = (op: xdr.Operation) => new TransactionBuilder(account, {
+                fee: '100',
+                networkPassphrase: NETWORKS[NETWORK].networkPassphrase,
+            }).addOperation(op).setTimeout(30).build();
+
+            // Fetch streams where user is sender
+            const senderResult = await server.simulateTransaction(builder(contract.call('get_streams_by_sender', nativeToScVal(Address.fromString(publicKey), { type: 'address' }))));
+            let senderStreams: Stream[] = [];
+            if (rpc.Api.isSimulationSuccess(senderResult)) {
+                senderStreams = scValToNative(senderResult.result!.retval).map((s: any) => ({
+                    id: s.id.toString(),
+                    sender: s.sender,
+                    recipient: s.recipient,
+                    token: s.token,
+                    totalAmount: s.total_amount.toString(),
+                    amountStreamed: s.amount_streamed.toString(),
+                    ratePerSecond: s.rate_per_second.toString(),
+                    startTime: Number(s.start_time),
+                    endTime: Number(s.end_time),
+                    status: s.status as StreamStatus,
+                }));
+            }
+
+            // Fetch streams where user is recipient
+            const recipientResult = await server.simulateTransaction(builder(contract.call('get_streams_by_recipient', nativeToScVal(Address.fromString(publicKey), { type: 'address' }))));
+            let recipientStreams: Stream[] = [];
+            if (rpc.Api.isSimulationSuccess(recipientResult)) {
+                recipientStreams = scValToNative(recipientResult.result!.retval).map((s: any) => ({
+                    id: s.id.toString(),
+                    sender: s.sender,
+                    recipient: s.recipient,
+                    token: s.token,
+                    totalAmount: s.total_amount.toString(),
+                    amountStreamed: s.amount_streamed.toString(),
+                    ratePerSecond: s.rate_per_second.toString(),
+                    startTime: Number(s.start_time),
+                    endTime: Number(s.end_time),
+                    status: s.status as StreamStatus,
+                }));
+            }
+
+            // Merge and de-duplicate
+            const allStreams = [...senderStreams, ...recipientStreams];
+            const uniqueStreams = allStreams.filter((v, i, a) => a.findIndex(t => (t.id === v.id)) === i);
+            setStreams(uniqueStreams);
+
+        } catch (error) {
+            console.error('Error fetching streams:', error);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchStreams();
+    }, [fetchStreams]);
+
+    const submitPayrollTx = async (op: xdr.Operation) => {
+        setIsLoading(true);
+        try {
+            const server = getSorobanServer();
+            const { Freighter } = await import("@stellar/freighter-api");
+            const publicKey = await Freighter.getPublicKey();
+            const account = await server.getAccount(publicKey);
+
+            const transaction = new TransactionBuilder(account, {
+                fee: '100000',
+                networkPassphrase: NETWORKS[NETWORK].networkPassphrase,
+            }).addOperation(op).setTimeout(30).build();
+
+            const simulated = await server.simulateTransaction(transaction);
+            if (rpc.Api.isSimulationError(simulated)) {
+                throw new Error(`Simulation failed: ${simulated.error}`);
+            }
+
+            const prepared = server.prepareTransaction(transaction, simulated);
+            const signedXdr = await signTransaction(prepared.toXDR(), NETWORKS[NETWORK].networkPassphrase);
+            
+            const result = await server.sendTransaction(
+                TransactionBuilder.fromXDR(signedXdr, NETWORKS[NETWORK].networkPassphrase)
+            );
+
+            if (result.status !== "PENDING") {
+                throw new Error(`Transaction failed: ${result.status}`);
+            }
+
+            // Wait for confirmation
+            for (let i = 0; i < 10; i++) {
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+                const status = await server.getTransaction(result.hash);
+                if (status.status === "SUCCESS") {
+                    fetchStreams();
+                    return status;
+                } else if (status.status === "FAILED") {
+                    throw new Error(`Transaction failed: ${status.resultXdr}`);
+                }
+            }
+            throw new Error("Transaction timed out");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
 	const buildCreateStreamXdr = async ({
 		recipient,
@@ -204,6 +283,7 @@ export function usePayrollStream() {
 
 				if (status.status === "SUCCESS") {
 					finalResult = status;
+                    fetchStreams();
 					break;
 				} else if (status.status === "FAILED") {
 					throw new Error(`Transaction failed: ${status.resultXdr}`);
@@ -214,7 +294,6 @@ export function usePayrollStream() {
 				throw new Error("Transaction timed out");
 			}
 
-			// Extract the stream ID from the result
 			const returnValue = finalResult.returnValue;
 			if (!returnValue) {
 				throw new Error("No return value from contract call");
@@ -230,13 +309,62 @@ export function usePayrollStream() {
 		}
 	};
 
+    const claimFromStream = async (streamId: string) => {
+        const contract = new Contract(CONTRACTS.payrollStream!);
+        const { Freighter } = await import("@stellar/freighter-api");
+        const publicKey = await Freighter.getPublicKey();
+        
+        return submitPayrollTx(contract.call('claim', 
+            nativeToScVal(Address.fromString(publicKey), { type: 'address' }),
+            nativeToScVal(Number(streamId), { type: 'u32' })
+        ));
+    };
+
+    const cancelStream = async (streamId: string) => {
+        const contract = new Contract(CONTRACTS.payrollStream!);
+        const { Freighter } = await import("@stellar/freighter-api");
+        const publicKey = await Freighter.getPublicKey();
+        
+        return submitPayrollTx(contract.call('cancel_stream', 
+            nativeToScVal(Address.fromString(publicKey), { type: 'address' }),
+            nativeToScVal(Number(streamId), { type: 'u32' })
+        ));
+    };
+
+    const getClaimable = async (streamId: string): Promise<number> => {
+        if (!CONTRACTS.payrollStream) return 0;
+        const server = getSorobanServer();
+        const contract = new Contract(CONTRACTS.payrollStream);
+
+        try {
+            const { Freighter } = await import("@stellar/freighter-api");
+            const publicKey = await Freighter.getPublicKey();
+            const account = await server.getAccount(publicKey);
+
+            const transaction = new TransactionBuilder(account, {
+                fee: '100',
+                networkPassphrase: NETWORKS[NETWORK].networkPassphrase,
+            }).addOperation(contract.call('get_claimable', nativeToScVal(Number(streamId), { type: 'u32' }))).build();
+
+            const result = await server.simulateTransaction(transaction);
+            if (rpc.Api.isSimulationSuccess(result)) {
+                const claimable = scValToNative(result.result!.retval);
+                return Number(claimable) / Number(STROOP_SCALE);
+            }
+            return 0;
+        } catch (error) {
+            console.error('Error getting claimable:', error);
+            return 0;
+        }
+    };
+
 	return {
-		streams: MOCK_STREAMS,
+		streams,
 		isLoading,
 		buildCreateStreamXdr,
 		createStream,
-		claimFromStream: async (_streamId: string) => {},
-		cancelStream: async (_streamId: string) => {},
-		getClaimable: async (_streamId: string): Promise<number> => 0,
+		claimFromStream,
+		cancelStream,
+		getClaimable,
 	};
 }
