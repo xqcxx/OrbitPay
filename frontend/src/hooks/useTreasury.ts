@@ -1,12 +1,23 @@
 'use client'
 
-import { useState, useEffect } from 'react';
-import { getSorobanServer, CONTRACTS } from '@/lib/network';
+import { useState, useEffect, useCallback } from 'react';
+import { CONTRACTS } from '@/lib/network';
+import { getSorobanServer } from '@/lib/soroban';
 import { xdr, Address, scValToNative } from '@stellar/stellar-sdk';
+
+export type TreasuryEventType =
+  | 'initialized'
+  | 'deposit'
+  | 'withdrawal_created'
+  | 'withdrawal_approved'
+  | 'withdrawal_executed'
+  | 'signer_added'
+  | 'signer_removed'
+  | 'threshold_updated';
 
 export interface TreasuryEvent {
   id: string;
-  type: 'deposit' | 'withdrawal_created' | 'withdrawal_approved' | 'withdrawal_executed' | 'signer_added' | 'signer_removed' | 'threshold_updated' | 'initialized';
+  type: TreasuryEventType;
   timestamp: number;
   ledger: number;
   details: {
@@ -27,11 +38,18 @@ export interface TreasuryTransactionHistory {
   hasMore: boolean;
 }
 
+export interface Signer {
+  address: string;
+  weight: number;
+}
+
 /**
  * Hook to interact with the Treasury contract.
  */
 export function useTreasury() {
   const [isLoading, setIsLoading] = useState(false);
+  const [signers, setSigners] = useState<Signer[]>([]);
+  const [threshold, setThreshold] = useState<number>(0);
   const [transactionHistory, setTransactionHistory] = useState<TreasuryTransactionHistory>({
     events: [],
     total: 0,
@@ -48,9 +66,6 @@ export function useTreasury() {
     }
 
     const server = getSorobanServer();
-    if (!server) {
-      throw new Error('Soroban server not configured');
-    }
 
     try {
       // Get events from the contract
@@ -59,7 +74,7 @@ export function useTreasury() {
         filters: [{
           contractIds: [CONTRACTS.treasury],
           topics: eventType ? [[
-            xdr.ScVal.scvSymbol(xdr.ScSymbol.symbol(eventType))
+            xdr.ScVal.scvSymbol(eventType).toXDR('base64')
           ]] : undefined,
         }],
         limit,
@@ -68,13 +83,13 @@ export function useTreasury() {
 
       const events: TreasuryEvent[] = eventsResponse.events.map((event) => {
         const topic = event.topic;
-        const data = event.data;
-        const eventType = topic[0].sym().toString();
+        const value = event.value;
+        const eventSymbol = topic[0].sym().toString();
 
         let type: TreasuryEvent['type'];
         let details: TreasuryEvent['details'] = {};
 
-        switch (eventType) {
+        switch (eventSymbol) {
           case 'init':
             type = 'initialized';
             details.admin = Address.fromScVal(topic[1]).toString();
@@ -82,43 +97,45 @@ export function useTreasury() {
           case 'deposit':
             type = 'deposit';
             details.recipient = Address.fromScVal(topic[1]).toString();
-            details.amount = scValToNative(data).toString();
+            details.amount = scValToNative(value).toString();
             break;
           case 'w_create':
             type = 'withdrawal_created';
             details.proposer = Address.fromScVal(topic[1]).toString();
-            details.proposalId = scValToNative(data) as number;
+            details.proposalId = scValToNative(value) as number;
             break;
           case 'approve':
             type = 'withdrawal_approved';
             details.signer = Address.fromScVal(topic[1]).toString();
-            details.proposalId = scValToNative(data) as number;
+            details.proposalId = scValToNative(value) as number;
             break;
           case 'w_exec':
             type = 'withdrawal_executed';
             details.recipient = Address.fromScVal(topic[1]).toString();
-            details.amount = scValToNative(data).toString();
+            details.amount = scValToNative(value).toString();
             break;
           case 's_add':
             type = 'signer_added';
-            details.signer = Address.fromScVal(data).toString();
+            details.signer = Address.fromScVal(value).toString();
             break;
           case 's_remove':
             type = 'signer_removed';
-            details.signer = Address.fromScVal(data).toString();
+            details.signer = Address.fromScVal(value).toString();
             break;
           case 't_upd':
             type = 'threshold_updated';
-            details.threshold = scValToNative(data) as number;
+            details.threshold = scValToNative(value) as number;
             break;
           default:
             type = 'deposit'; // fallback
         }
 
+        const timestamp = event.ledgerClosedAt ? new Date(event.ledgerClosedAt).getTime() / 1000 : Date.now() / 1000;
+
         return {
           id: event.id,
           type,
-          timestamp: event.createdAt,
+          timestamp,
           ledger: event.ledger,
           details,
         };
@@ -127,7 +144,7 @@ export function useTreasury() {
       return {
         events,
         total: eventsResponse.events.length,
-        hasMore: eventsResponse.cursor !== undefined,
+        hasMore: eventsResponse.events.length === limit,
       };
     } catch (error) {
       console.error('Error fetching treasury events:', error);
@@ -135,7 +152,7 @@ export function useTreasury() {
     }
   };
 
-  const loadTransactionHistory = async (
+  const loadTransactionHistory = useCallback(async (
     limit: number = 20,
     cursor?: string,
     eventType?: string
@@ -149,11 +166,26 @@ export function useTreasury() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadTransactionHistory();
-  }, []);
+  }, [loadTransactionHistory]);
+
+  const addSigner = async (address: string, weight: number) => {
+    console.log('Adding signer:', address, weight);
+    // TODO: Implement actual contract call
+  };
+
+  const removeSigner = async (address: string) => {
+    console.log('Removing signer:', address);
+    // TODO: Implement actual contract call
+  };
+
+  const updateThreshold = async (newThreshold: number) => {
+    console.log('Updating threshold:', newThreshold);
+    // TODO: Implement actual contract call
+  };
 
   return {
     signers,
@@ -162,6 +194,9 @@ export function useTreasury() {
     isLoading,
     transactionHistory,
     loadTransactionHistory,
+    addSigner,
+    removeSigner,
+    updateThreshold,
     deposit: async (_token: string, _amount: number) => {},
     createWithdrawal: async (_token: string, _recipient: string, _amount: number) => {},
     approveWithdrawal: async (_proposalId: number) => {},
