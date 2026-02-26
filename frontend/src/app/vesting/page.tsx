@@ -1,6 +1,6 @@
-import { VestingScheduleBuilder } from '@/components/VestingScheduleBuilder'
 'use client'
 
+import { VestingScheduleBuilder } from '@/components/VestingScheduleBuilder'
 import React, { useState } from 'react';
 import ClaimModal from '@/components/ClaimModal';
 import VestingTimeline from '@/components/VestingTimeline';
@@ -69,20 +69,18 @@ export default function VestingPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-8">
-      <h1 className="text-3xl font-bold mb-6">⏳ Token Vesting</h1>
-      <p className="text-gray-400 mb-8">
-        Create cliff + linear vesting schedules for team members, advisors, and investors.
-      </p>
-      <VestingScheduleBuilder />
     <div className="max-w-6xl mx-auto p-8">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">⏳ Token Vesting</h1>
           <p className="text-gray-400 mt-2">
-            Manage your vested token allocations and claim rewards.
+            Create cliff + linear vesting schedules for team members, advisors, and investors, and manage allocations.
           </p>
         </div>
+      </div>
+
+      <div className="mb-12">
+        <VestingScheduleBuilder />
       </div>
 
       {successMessage && (

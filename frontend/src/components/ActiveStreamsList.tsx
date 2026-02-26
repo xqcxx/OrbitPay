@@ -72,7 +72,7 @@ export default function ActiveStreamsList() {
                 ))}
                 {filteredStreams.length === 0 && (
                     <div className="col-span-full py-12 text-center text-gray-500 bg-gray-900/20 rounded-xl border border-dashed border-gray-800">
-                        No streams match the "{filter === 'sent' ? 'Sent by me' : 'Received by me'}" filter.
+                        No streams match the &quot;{filter === 'sent' ? 'Sent by me' : 'Received by me'}&quot; filter.
                     </div>
                 )}
             </div>

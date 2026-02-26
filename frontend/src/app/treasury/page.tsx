@@ -1,3 +1,9 @@
+'use client'
+
+import React from 'react';
+import { useFreighter } from "@/contexts/FreighterContext";
+import { Lock, ShieldAlert } from "lucide-react";
+import SignerManagementPanel from "@/components/SignerManagementPanel";
 import TransactionHistory from "@/components/TransactionHistory";
 
 export default function TreasuryPage() {
