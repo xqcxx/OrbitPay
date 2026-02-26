@@ -1,9 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Calendar, Clock, DollarSign, User, Coins } from "lucide-react";
+import { Calendar, Clock, DollarSign, User, Coins, Zap, Timer, ArrowRight } from "lucide-react";
 import { usePayrollStream } from "@/hooks/usePayrollStream";
 import { StrKey } from "@stellar/stellar-sdk";
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { cn } from "@/lib/utils";
 
 interface StreamFormData {
 	recipient: string;
@@ -16,7 +20,7 @@ interface StreamFormData {
 }
 
 interface StreamCreationFormProps {
-	onSuccess?: (streamId: number) => void;
+	onSuccess?: (streamId: string) => void;
 	onError?: (error: string) => void;
 }
 
@@ -43,7 +47,6 @@ export default function StreamCreationForm({
 		ratePerHour: number;
 		ratePerDay: number;
 	} | null>(null);
-	const [durationPreview, setDurationPreview] = useState<string>("");
 
 	// Available tokens - in a real implementation this would come from the network
 	const availableTokens = [
@@ -53,40 +56,13 @@ export default function StreamCreationForm({
 			name: "USD Coin",
 		},
 		{
-			symbol: "USDT",
-			address: "CCZX6LM636L7QXZEK62EFWKL6DXCNSEWFW2MZNHX3LYBR6V5B7MNNRNY",
-			name: "Tether USD",
-		},
-		{
 			symbol: "XLM",
 			address: "CDLZFA7IYMV2DKV2VEBZLZ6XVJDV6HJT4EHZM6LOJH6TQL6YN6MQIWCD",
 			name: "Stellar Lumens",
-		},
+		}
 	];
 
-	// Calculate stream rates when amount or duration changes
 	useEffect(() => {
-		if (
-			formData.startDate &&
-			formData.startTime &&
-			formData.endDate &&
-			formData.endTime
-		) {
-			const startDateTime = new Date(
-				`${formData.startDate}T${formData.startTime}`,
-			);
-			const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
-
-			if (endDateTime > startDateTime) {
-				const durationMs = endDateTime.getTime() - startDateTime.getTime();
-				setDurationPreview(formatDuration(durationMs / 1000));
-			} else {
-				setDurationPreview("");
-			}
-		} else {
-			setDurationPreview("");
-		}
-
 		if (
 			formData.totalAmount &&
 			formData.startDate &&
@@ -95,14 +71,11 @@ export default function StreamCreationForm({
 			formData.endTime
 		) {
 			const amount = parseFloat(formData.totalAmount);
-			const startDateTime = new Date(
-				`${formData.startDate}T${formData.startTime}`,
-			);
+			const startDateTime = new Date(`${formData.startDate}T${formData.startTime}`);
 			const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
 
 			if (!isNaN(amount) && amount > 0 && endDateTime > startDateTime) {
-				const durationMs = endDateTime.getTime() - startDateTime.getTime();
-				const durationSeconds = durationMs / 1000;
+				const durationSeconds = (endDateTime.getTime() - startDateTime.getTime()) / 1000;
 
 				if (durationSeconds > 0) {
 					setRateInfo({
@@ -121,114 +94,64 @@ export default function StreamCreationForm({
 		} else {
 			setRateInfo(null);
 		}
-	}, [
-		formData.totalAmount,
-		formData.startDate,
-		formData.startTime,
-		formData.endDate,
-		formData.endTime,
-	]);
+	}, [formData]);
 
 	const validateForm = (): boolean => {
 		const newErrors: Partial<StreamFormData> = {};
 
-		// Validate recipient address (basic Stellar address validation)
 		if (!formData.recipient) {
 			newErrors.recipient = "Recipient address is required";
 		} else if (!StrKey.isValidEd25519PublicKey(formData.recipient)) {
-			newErrors.recipient = "Invalid Stellar address format";
+			newErrors.recipient = "Invalid Stellar address";
 		}
 
-		// Validate token selection
-		if (!formData.token) {
-			newErrors.token = "Please select a token";
-		}
+		if (!formData.token) newErrors.token = "Select a token";
 
-		// Validate amount
 		if (!formData.totalAmount) {
 			newErrors.totalAmount = "Amount is required";
-		} else if (!/^\d+(\.\d{1,7})?$/.test(formData.totalAmount)) {
-			newErrors.totalAmount = "Use up to 7 decimal places";
-		} else {
-			const amount = parseFloat(formData.totalAmount);
-			if (isNaN(amount) || amount <= 0) {
-				newErrors.totalAmount = "Amount must be a positive number";
-			}
+		} else if (parseFloat(formData.totalAmount) <= 0) {
+			newErrors.totalAmount = "Must be > 0";
 		}
 
-		// Validate start date and time
 		if (!formData.startDate || !formData.startTime) {
-			if (!formData.startDate) newErrors.startDate = "Start date is required";
-			if (!formData.startTime) newErrors.startTime = "Start time is required";
+			newErrors.startDate = "Required";
 		}
 
-		// Validate end date and time
 		if (!formData.endDate || !formData.endTime) {
-			if (!formData.endDate) newErrors.endDate = "End date is required";
-			if (!formData.endTime) newErrors.endTime = "End time is required";
+			newErrors.endDate = "Required";
 		}
 
-		// Validate that end time is after start time
-		if (
-			formData.startDate &&
-			formData.startTime &&
-			formData.endDate &&
-			formData.endTime
-		) {
-			const startDateTime = new Date(
-				`${formData.startDate}T${formData.startTime}`,
-			);
-			const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
+		const startDateTime = new Date(`${formData.startDate}T${formData.startTime}`);
+		const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
 
-			if (endDateTime <= startDateTime) {
-				newErrors.endDate = "End time must be after start time";
-			}
-
-			// Check that start time is not in the past
-			if (startDateTime < new Date()) {
-				newErrors.startDate = "Start time cannot be in the past";
-			}
+		if (endDateTime <= startDateTime) {
+			newErrors.endDate = "Must be after start";
 		}
 
 		setErrors(newErrors);
 		return Object.keys(newErrors).length === 0;
 	};
 
-	const handleInputChange = (field: keyof StreamFormData, value: string) => {
-		const sanitizedValue =
-			field === "recipient" ? value.trim().toUpperCase() : value;
-		setFormData((prev) => ({ ...prev, [field]: sanitizedValue }));
-		// Clear error for this field when user starts typing
-		if (errors[field]) {
-			setErrors((prev) => ({ ...prev, [field]: undefined }));
-		}
-	};
-
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
-		if (validateForm()) {
-			try {
-				const startDateTime = new Date(
-					`${formData.startDate}T${formData.startTime}`,
-				);
-				const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`);
+		if (!validateForm()) return;
 
-				const startTime = Math.floor(startDateTime.getTime() / 1000);
-				const endTime = Math.floor(endDateTime.getTime() / 1000);
-				const streamId = await createStream(
-					formData.recipient,
-					formData.token,
-					formData.totalAmount,
-					startTime,
-					endTime,
-				);
+		try {
+			const startTime = Math.floor(new Date(`${formData.startDate}T${formData.startTime}`).getTime() / 1000);
+			const endTime = Math.floor(new Date(`${formData.endDate}T${formData.endTime}`).getTime() / 1000);
+			
+			const streamId = await createStream(
+				formData.recipient,
+				formData.token,
+				formData.totalAmount,
+				startTime,
+				endTime,
+			);
 
-				onSuccess?.(streamId);
-			} catch (error) {
-				const errorMessage =
-					error instanceof Error ? error.message : "Failed to create stream";
-				onError?.(errorMessage);
-			}
+			onSuccess?.(streamId);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : "Failed to create stream";
+			onError?.(errorMessage);
 		}
 	};
 
@@ -236,214 +159,168 @@ export default function StreamCreationForm({
 		const days = Math.floor(seconds / 86400);
 		const hours = Math.floor((seconds % 86400) / 3600);
 		const minutes = Math.floor((seconds % 3600) / 60);
-
-		const parts = [];
-		if (days > 0) parts.push(`${days}d`);
-		if (hours > 0) parts.push(`${hours}h`);
-		if (minutes > 0) parts.push(`${minutes}m`);
-
-		return parts.length > 0 ? parts.join(" ") : "< 1m";
+		return [days && `${days}d`, hours && `${hours}h`, minutes && `${minutes}m`].filter(Boolean).join(" ") || "< 1m";
 	};
 
 	return (
-		<div className="max-w-2xl mx-auto bg-gray-900 rounded-xl p-6 border border-gray-700">
-			<h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-				<DollarSign className="w-6 h-6 text-green-400" />
-				Create Payment Stream
-			</h2>
-
-			<form onSubmit={handleSubmit} className="space-y-6">
-				{/* Recipient Address */}
-				<div>
-					<label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-						<User className="w-4 h-4" />
-						Recipient Address
-					</label>
-					<input
-						type="text"
-						value={formData.recipient}
-						onChange={(e) => handleInputChange("recipient", e.target.value)}
-						placeholder="GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-						className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white font-mono text-sm"
-					/>
-					{errors.recipient && (
-						<p className="mt-1 text-sm text-red-400">{errors.recipient}</p>
-					)}
-				</div>
-
-				{/* Token Selector */}
-				<div>
-					<label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-						<Coins className="w-4 h-4" />
-						Token
-					</label>
-					<select
-						value={formData.token}
-						onChange={(e) => handleInputChange("token", e.target.value)}
-						className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white"
-					>
-						<option value="">Select a token</option>
-						{availableTokens.map((token) => (
-							<option key={token.address} value={token.address}>
-								{token.symbol} - {token.name}
-							</option>
-						))}
-					</select>
-					{errors.token && (
-						<p className="mt-1 text-sm text-red-400">{errors.token}</p>
-					)}
-				</div>
-
-				{/* Total Amount */}
-				<div>
-					<label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-						<DollarSign className="w-4 h-4" />
-						Total Amount
-					</label>
-					<input
-						type="number"
-						step="0.0000001"
-						value={formData.totalAmount}
-						onChange={(e) => handleInputChange("totalAmount", e.target.value)}
-						placeholder="0.00"
-						className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white"
-					/>
-					{errors.totalAmount && (
-						<p className="mt-1 text-sm text-red-400">{errors.totalAmount}</p>
-					)}
-				</div>
-
-				{/* Start Date and Time */}
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<div>
-						<label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-							<Calendar className="w-4 h-4" />
-							Start Date
+		<form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in duration-500">
+			<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+				<div className="space-y-4">
+					<div className="space-y-2">
+						<label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+							<User size={12} className="text-gray-400" />
+							Recipient Address
 						</label>
 						<input
-							type="date"
-							value={formData.startDate}
-							onChange={(e) => handleInputChange("startDate", e.target.value)}
-							min={new Date().toISOString().split("T")[0]}
-							className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white"
+							type="text"
+							value={formData.recipient}
+							onChange={(e) => setFormData(prev => ({ ...prev, recipient: e.target.value.toUpperCase() }))}
+							placeholder="G..."
+							className={cn(
+								"w-full bg-gray-900/50 border rounded-2xl px-4 py-3 text-sm focus:border-blue-500 transition-all outline-none font-mono",
+								errors.recipient ? "border-red-500/50" : "border-gray-800"
+							)}
 						/>
-						{errors.startDate && (
-							<p className="mt-1 text-sm text-red-400">{errors.startDate}</p>
-						)}
+						{errors.recipient && <p className="text-[10px] text-red-400 font-bold">{errors.recipient}</p>}
 					</div>
-					<div>
-						<label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-							<Clock className="w-4 h-4" />
-							Start Time
+
+					<div className="space-y-2">
+						<label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+							<Coins size={12} className="text-gray-400" />
+							Token Asset
+						</label>
+						<select
+							value={formData.token}
+							onChange={(e) => setFormData(prev => ({ ...prev, token: e.target.value }))}
+							className={cn(
+								"w-full bg-gray-900/50 border rounded-2xl px-4 py-3 text-sm focus:border-blue-500 transition-all outline-none appearance-none",
+								errors.token ? "border-red-500/50" : "border-gray-800"
+							)}
+						>
+							<option value="">Select Asset</option>
+							{availableTokens.map((t) => (
+								<option key={t.address} value={t.address}>{t.symbol} — {t.name}</option>
+							))}
+						</select>
+					</div>
+
+					<div className="space-y-2">
+						<label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+							<DollarSign size={12} className="text-gray-400" />
+							Total Amount
 						</label>
 						<input
-							type="time"
-							value={formData.startTime}
-							onChange={(e) => handleInputChange("startTime", e.target.value)}
-							className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white"
+							type="number"
+							value={formData.totalAmount}
+							onChange={(e) => setFormData(prev => ({ ...prev, totalAmount: e.target.value }))}
+							placeholder="0.00"
+							className={cn(
+								"w-full bg-gray-900/50 border rounded-2xl px-4 py-3 text-sm focus:border-blue-500 transition-all outline-none font-bold",
+								errors.totalAmount ? "border-red-500/50" : "border-gray-800"
+							)}
 						/>
-						{errors.startTime && (
-							<p className="mt-1 text-sm text-red-400">{errors.startTime}</p>
-						)}
 					</div>
 				</div>
 
-				{/* End Date and Time */}
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<div>
-						<label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-							<Calendar className="w-4 h-4" />
-							End Date
-						</label>
-						<input
-							type="date"
-							value={formData.endDate}
-							onChange={(e) => handleInputChange("endDate", e.target.value)}
-							min={formData.startDate || new Date().toISOString().split("T")[0]}
-							className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white"
-						/>
-						{errors.endDate && (
-							<p className="mt-1 text-sm text-red-400">{errors.endDate}</p>
-						)}
-					</div>
-					<div>
-						<label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
-							<Clock className="w-4 h-4" />
-							End Time
-						</label>
-						<input
-							type="time"
-							value={formData.endTime}
-							onChange={(e) => handleInputChange("endTime", e.target.value)}
-							className="w-full px-4 py-3 bg-gray-800 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white"
-						/>
-						{errors.endTime && (
-							<p className="mt-1 text-sm text-red-400">{errors.endTime}</p>
-						)}
-					</div>
-				</div>
-
-				{durationPreview && (
-					<p className="text-sm text-gray-400 -mt-2">
-						Duration preview:{" "}
-						<span className="text-white">{durationPreview}</span>
-					</p>
-				)}
-
-				{/* Rate Information */}
-				{rateInfo && (
-					<div className="bg-gray-800 rounded-lg p-4 border border-gray-600">
-						<h3 className="text-sm font-medium text-gray-300 mb-3">
-							Stream Details
-						</h3>
-						<div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-							<div>
-								<p className="text-gray-400">Duration</p>
-								<p className="text-white font-medium">
-									{formatDuration(rateInfo.duration)}
-								</p>
-							</div>
-							<div>
-								<p className="text-gray-400">Per Second</p>
-								<p className="text-white font-medium">
-									{rateInfo.ratePerSecond.toFixed(7)}
-								</p>
-							</div>
-							<div>
-								<p className="text-gray-400">Per Hour</p>
-								<p className="text-white font-medium">
-									{rateInfo.ratePerHour.toFixed(4)}
-								</p>
-							</div>
-							<div>
-								<p className="text-gray-400">Per Day</p>
-								<p className="text-white font-medium">
-									{rateInfo.ratePerDay.toFixed(2)}
-								</p>
-							</div>
+				<div className="space-y-4">
+					<div className="grid grid-cols-2 gap-3">
+						<div className="space-y-2">
+							<label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+								<Calendar size={12} />
+								Start Date
+							</label>
+							<input
+								type="date"
+								value={formData.startDate}
+								onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
+								className="w-full bg-gray-900/50 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white outline-none focus:border-blue-500"
+							/>
+						</div>
+						<div className="space-y-2">
+							<label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+								<Clock size={12} />
+								Time
+							</label>
+							<input
+								type="time"
+								value={formData.startTime}
+								onChange={(e) => setFormData(prev => ({ ...prev, startTime: e.target.value }))}
+								className="w-full bg-gray-900/50 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white outline-none focus:border-blue-500"
+							/>
 						</div>
 					</div>
-				)}
 
-				{/* Submit Button */}
-				<button
-					type="submit"
-					disabled={isLoading}
-					className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
-				>
-					{isLoading ? (
-						<>
-							<div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-							Creating Stream...
-						</>
-					) : (
-						<>
-							<DollarSign className="w-4 h-4" />
-							Create Payment Stream
-						</>
+					<div className="grid grid-cols-2 gap-3">
+						<div className="space-y-2">
+							<label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+								<Calendar size={12} />
+								End Date
+							</label>
+							<input
+								type="date"
+								value={formData.endDate}
+								onChange={(e) => setFormData(prev => ({ ...prev, endDate: e.target.value }))}
+								className="w-full bg-gray-900/50 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white outline-none focus:border-blue-500"
+							/>
+						</div>
+						<div className="space-y-2">
+							<label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+								<Clock size={12} />
+								Time
+							</label>
+							<input
+								type="time"
+								value={formData.endTime}
+								onChange={(e) => setFormData(prev => ({ ...prev, endTime: e.target.value }))}
+								className="w-full bg-gray-900/50 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white outline-none focus:border-blue-500"
+							/>
+						</div>
+					</div>
+
+					{rateInfo && (
+						<Card className="bg-blue-600/10 border-blue-500/20 shadow-none">
+							<CardContent className="p-4 space-y-4">
+								<div className="flex items-center justify-between">
+									<span className="text-[10px] font-black uppercase tracking-widest text-blue-400">Stream Velocity</span>
+									<Zap size={14} className="text-blue-400 animate-pulse" />
+								</div>
+								<div className="grid grid-cols-2 gap-4">
+									<div>
+										<p className="text-[9px] text-gray-500 font-black uppercase tracking-tighter">Per Hour</p>
+										<p className="text-sm font-black text-white">{rateInfo.ratePerHour.toFixed(4)}</p>
+									</div>
+									<div>
+										<p className="text-[9px] text-gray-500 font-black uppercase tracking-tighter">Per Day</p>
+										<p className="text-sm font-black text-white">{rateInfo.ratePerDay.toFixed(2)}</p>
+									</div>
+								</div>
+								<div className="pt-2 border-t border-blue-500/10 flex items-center justify-between">
+									<span className="text-[9px] text-gray-500 font-bold">Total Duration</span>
+									<span className="text-[11px] text-blue-300 font-black">{formatDuration(rateInfo.duration)}</span>
+								</div>
+							</CardContent>
+						</Card>
 					)}
-				</button>
-			</form>
-		</div>
+				</div>
+			</div>
+
+			<Button 
+				type="submit" 
+				className="w-full rounded-2xl h-14 font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-blue-900/20"
+				disabled={isLoading}
+			>
+				{isLoading ? (
+                    <div className="flex items-center gap-2">
+					    <div className="w-4 h-4 border-2 border-white border-t-white/30 rounded-full animate-spin" />
+                        Initializing...
+                    </div>
+				) : (
+					<div className="flex items-center gap-2">
+						Launch Continuous Stream
+						<ArrowRight size={16} />
+					</div>
+				)}
+			</Button>
+		</form>
 	);
 }

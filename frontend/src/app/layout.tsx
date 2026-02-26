@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import '@/styles/globals.css'
+import { Toaster } from '@/components/ui/Toaster'
 import Footer from '@/components/Footer'
 import Navbar from '@/components/Navbar'
 import { FreighterProvider } from '@/contexts/FreighterContext'
@@ -31,6 +32,7 @@ export default function RootLayout({
             <main className="flex-1">{children}</main>
             <Footer />
           </div>
+          <Toaster />
         </FreighterProvider>
       </body>
     </html>
