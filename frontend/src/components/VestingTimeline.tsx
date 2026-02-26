@@ -1,30 +1,26 @@
 'use client'
 
-import React, { useMemo } from 'react';
-import { Info } from 'lucide-react';
+import React from 'react';
+import { Info, Clock, CheckCircle2, Lock } from 'lucide-react';
+import { Badge } from "@/components/ui/Badge";
+import { cn } from "@/lib/utils";
 
 interface VestingTimelineProps {
-    startTime: number; // Unix timestamp
-    cliffDuration: number; // Seconds
-    totalDuration: number; // Seconds
-    totalAmount: bigint;
-    vestedAmount: bigint;
-    claimedAmount: bigint;
+    schedule: {
+        startTime: number;
+        cliffDuration: number;
+        totalDuration: number;
+        totalAmount: string;
+        claimedAmount: string;
+    }
 }
 
-export default function VestingTimeline({
-    startTime,
-    cliffDuration,
-    totalDuration,
-    totalAmount,
-    vestedAmount,
-    claimedAmount,
-}: VestingTimelineProps) {
+export default function VestingTimeline({ schedule }: VestingTimelineProps) {
+    const { startTime, cliffDuration, totalDuration, totalAmount, claimedAmount } = schedule;
     const now = Math.floor(Date.now() / 1000);
     const endTime = startTime + totalDuration;
     const cliffTime = startTime + cliffDuration;
 
-    // Percentage calculations for markers and segments
     const getProgress = (time: number) => {
         const elapsed = time - startTime;
         return Math.min(Math.max((elapsed / totalDuration) * 100, 0), 100);
@@ -33,106 +29,99 @@ export default function VestingTimeline({
     const currentPercent = getProgress(now);
     const cliffPercent = getProgress(cliffTime);
 
-    // Segment widths
-    const total = Number(totalAmount);
-    const claimedPercent = total > 0 ? (Number(claimedAmount) / total) * 100 : 0;
-    const vestedOnlyPercent = total > 0 ? ((Number(vestedAmount) - Number(claimedAmount)) / total) * 100 : 0;
-    const lockedPercent = 100 - claimedPercent - vestedOnlyPercent;
+    const total = parseFloat(totalAmount);
+    const claimed = parseFloat(claimedAmount);
+    
+    // Calculate vested amount (rough estimate for UI)
+    let vested = 0;
+    if (now >= cliffTime) {
+        const elapsedSinceStart = now - startTime;
+        vested = (elapsedSinceStart / totalDuration) * total;
+        vested = Math.min(total, vested);
+    }
+
+    const claimedPercent = total > 0 ? (claimed / total) * 100 : 0;
+    const vestedOnlyPercent = total > 0 ? (Math.max(0, vested - claimed) / total) * 100 : 0;
 
     const formatDate = (timestamp: number) => {
         return new Date(timestamp * 1000).toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
-            year: '2-digit',
+            year: 'numeric',
         });
     };
 
     return (
-        <div className="w-full space-y-8 py-4">
-            {/* Timeline Bar */}
-            <div className="relative group">
-                <div className="h-6 bg-gray-800/50 rounded-full overflow-hidden flex border border-gray-700/50 backdrop-blur-sm">
-                    {/* Claimed (Blue) */}
+        <div className="w-full space-y-6">
+            <div className="relative pt-6 pb-2">
+                {/* Timeline base */}
+                <div className="h-2.5 w-full bg-gray-800 rounded-full overflow-hidden flex p-0.5">
+                    {/* Claimed */}
                     <div
-                        className="h-full bg-gradient-to-r from-blue-600 to-blue-500 transition-all duration-700 ease-out relative"
+                        className="h-full bg-blue-500 rounded-l-full transition-all duration-1000"
                         style={{ width: `${claimedPercent}%` }}
-                    >
-                        <div className="absolute inset-0 bg-white/10 animate-pulse-slow" />
-                    </div>
-
-                    {/* Vested but not claimed (Green) */}
+                    />
+                    {/* Vested but not claimed */}
                     <div
-                        className="h-full bg-gradient-to-r from-emerald-600 to-emerald-500 transition-all duration-700 ease-out"
+                        className="h-full bg-green-400 transition-all duration-1000"
                         style={{ width: `${vestedOnlyPercent}%` }}
                     />
-
-                    {/* Locked (Gray) */}
-                    <div
-                        className="h-full bg-transparent transition-all duration-700 ease-out"
-                        style={{ width: `${lockedPercent}%` }}
-                    />
-                </div>
-
-                {/* Current Position Marker overlay */}
-                <div
-                    className="absolute top-[-8px] bottom-[-8px] w-0.5 bg-white/40 z-10 transition-all duration-700"
-                    style={{ left: `${currentPercent}%` }}
-                >
-                    <div className="absolute top-[-4px] left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-white shadow-glow" />
-                    <div className="absolute bottom-[-16px] left-1/2 -translate-x-1/2 text-[10px] font-bold text-white uppercase tracking-tighter whitespace-nowrap bg-black/40 px-1 rounded">
-                        Now
-                    </div>
                 </div>
 
                 {/* Cliff Marker */}
-                <div
-                    className="absolute top-0 bottom-0 w-px border-l border-dashed border-orange-400/50 z-0"
+                <div 
+                    className="absolute top-0 bottom-0 w-px border-l border-dashed border-orange-500/50"
                     style={{ left: `${cliffPercent}%` }}
                 >
-                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] text-orange-400 font-bold uppercase tracking-tight">
-                        Cliff
-                    </div>
+                    <div className="absolute -top-1 left-[-4px] w-2 h-2 rounded-full bg-orange-500" />
+                    <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[8px] font-black uppercase tracking-widest text-orange-500">Cliff</div>
+                </div>
+
+                {/* Current Position */}
+                <div 
+                    className="absolute top-4 bottom-0 w-px bg-white/30 z-10"
+                    style={{ left: `${currentPercent}%` }}
+                >
+                    <div className="absolute -bottom-1 left-[-4px] w-2 h-2 rounded-full bg-white shadow-xl" />
                 </div>
             </div>
 
-            {/* Date Labels */}
-            <div className="flex justify-between items-center text-[10px] text-gray-500 font-medium uppercase tracking-widest px-1">
-                <div className="flex flex-col items-start gap-1">
-                    <span className="text-gray-600">Start</span>
-                    <span className="text-gray-300 bg-gray-800 px-1.5 py-0.5 rounded">{formatDate(startTime)}</span>
+            <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="space-y-1">
+                    <p className="text-[8px] font-black uppercase tracking-widest text-gray-600">Start Date</p>
+                    <p className="text-[10px] font-bold text-gray-400">{formatDate(startTime)}</p>
                 </div>
-
-                <div className="flex flex-col items-center gap-1">
-                    <span className="text-gray-600">Cliff</span>
-                    <span className="text-orange-400/80 bg-orange-900/20 px-1.5 py-0.5 rounded">{formatDate(cliffTime)}</span>
+                <div className="space-y-1">
+                    <p className="text-[8px] font-black uppercase tracking-widest text-gray-600">Cliff Date</p>
+                    <p className="text-[10px] font-bold text-orange-400/80">{formatDate(cliffTime)}</p>
                 </div>
-
-                <div className="flex flex-col items-end gap-1 text-right">
-                    <span className="text-gray-600">End</span>
-                    <span className="text-gray-300 bg-gray-800 px-1.5 py-0.5 rounded">{formatDate(endTime)}</span>
+                <div className="space-y-1">
+                    <p className="text-[8px] font-black uppercase tracking-widest text-gray-600">End Date</p>
+                    <p className="text-[10px] font-bold text-gray-400">{formatDate(endTime)}</p>
                 </div>
             </div>
 
-            {/* Legend & Summary */}
-            <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-gray-800/50">
+            <div className="flex items-center justify-between pt-4 border-t border-gray-800/50">
                 <div className="flex gap-4">
-                    <div className="flex items-center gap-2 text-[11px] text-gray-400">
-                        <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                        <span>Claimed</span>
+                    <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-blue-500" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Claimed</span>
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] text-gray-400">
-                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                        <span>Vested</span>
+                    <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-green-400" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Vested</span>
                     </div>
-                    <div className="flex items-center gap-2 text-[11px] text-gray-400">
-                        <div className="w-2.5 h-2.5 rounded-full bg-gray-700" />
-                        <span>Locked</span>
+                    <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-gray-800" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-gray-500">Locked</span>
                     </div>
                 </div>
-
-                <div className="flex items-center gap-1.5 text-xs text-purple-400 font-bold bg-purple-900/10 px-2 py-1 rounded-lg border border-purple-500/20">
-                    <Info size={14} className="opacity-70" />
-                    <span>Vesting linearly over {(totalDuration / (3600 * 24 * 30)).toFixed(0)} months</span>
+                
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-purple-500/10 rounded-full border border-purple-500/20">
+                    <Info size={10} className="text-purple-400" />
+                    <span className="text-[9px] font-black uppercase tracking-widest text-purple-400">
+                        {Math.floor(totalDuration / (30 * 24 * 3600))} Month Plan
+                    </span>
                 </div>
             </div>
         </div>
