@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
-import { getSorobanServer, CONTRACTS, NETWORK } from '@/lib/network';
+import { CONTRACTS, NETWORK } from '@/lib/network';
+import { getSorobanServer } from '@/lib/soroban';
 import { connectWallet, signTransaction } from '@/lib/wallet';
 import * as StellarSdk from '@stellar/stellar-sdk';
 

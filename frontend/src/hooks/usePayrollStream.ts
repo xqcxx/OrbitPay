@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
 	Contract,
 	Address,
 	scValToNative,
 	nativeToScVal,
 	TransactionBuilder,
+	rpc,
 } from "@stellar/stellar-sdk";
-import { CONTRACTS, NETWORK, getSorobanServer } from "@/lib/network";
+import { CONTRACTS, NETWORK, NETWORKS } from "@/lib/network";
+import { getSorobanServer } from "@/lib/soroban";
 import { signTransaction } from "@/lib/wallet";
 
 const STROOP_SCALE = 10_000_000n;
@@ -19,6 +21,21 @@ interface CreateStreamPayload {
 	amount: string;
 	startTime: number;
 	endTime: number;
+}
+
+export type StreamStatus = 'Active' | 'Paused' | 'Cancelled' | 'Completed'
+
+export interface Stream {
+  id: string
+  sender: string
+  recipient: string
+  token: string
+  totalAmount: number
+  amountStreamed: number
+  ratePerSecond: number
+  startTime: number
+  endTime: number
+  status: StreamStatus
 }
 
 function decimalToI128(value: string): bigint {
@@ -38,37 +55,6 @@ function decimalToI128(value: string): bigint {
 	}
 
 	return total;
-}
-
-interface Stream {
-	id: number;
-	sender: string;
-	recipient: string;
-	token: string;
-	totalAmount: number;
-	claimedAmount: number;
-	startTime: number;
-	endTime: number;
-	lastClaimTime: number;
-	status: "Active" | "Completed" | "Cancelled";
-	ratePerSecond: number;
-}
-
-import { useEffect, useState } from 'react'
-
-export type StreamStatus = 'Active' | 'Paused' | 'Cancelled' | 'Completed'
-
-export interface Stream {
-  id: string
-  sender: string
-  recipient: string
-  token: string
-  totalAmount: number
-  amountStreamed: number
-  ratePerSecond: number
-  startTime: number
-  endTime: number
-  status: StreamStatus
 }
 
 // Mock Data for FE-12 Development
@@ -129,9 +115,6 @@ export function usePayrollStream() {
 		}
 
 		const server = getSorobanServer();
-		if (!server) {
-			throw new Error("Soroban server not configured");
-		}
 
 		const { Freighter } = await import("@stellar/freighter-api");
 		const publicKey = await Freighter.getPublicKey();
@@ -164,21 +147,18 @@ export function usePayrollStream() {
 		const account = await server.getAccount(publicKey);
 		const transaction = new TransactionBuilder(account, {
 			fee: "100000",
-			networkPassphrase: NETWORK.networkPassphrase,
+			networkPassphrase: NETWORKS[NETWORK].networkPassphrase,
 		})
 			.addOperation(call)
 			.setTimeout(30)
 			.build();
 
 		const simulated = await server.simulateTransaction(transaction);
-		if (simulated.error) {
+		if (rpc.Api.isSimulationError(simulated)) {
 			throw new Error(`Simulation failed: ${simulated.error}`);
 		}
 
-		const assembledTransaction = TransactionBuilder.assembleTransaction(
-			transaction,
-			simulated,
-		);
+		const assembledTransaction = server.prepareTransaction(transaction, simulated);
 
 		return {
 			xdr: assembledTransaction.toXDR(),
@@ -192,15 +172,12 @@ export function usePayrollStream() {
 		amount: string,
 		startTime: number,
 		endTime: number,
-	): Promise<number> => {
+	): Promise<string> => {
 		setIsLoading(true);
 		try {
 			const server = getSorobanServer();
-			if (!server) {
-				throw new Error("Soroban server not configured");
-			}
 
-			const { xdr } = await buildCreateStreamXdr({
+			const { xdr: txXdr } = await buildCreateStreamXdr({
 				recipient,
 				token,
 				amount,
@@ -209,10 +186,10 @@ export function usePayrollStream() {
 			});
 
 			// Sign and submit
-			const signedXdr = await signTransaction(xdr, NETWORK.networkPassphrase);
+			const signedXdr = await signTransaction(txXdr, NETWORKS[NETWORK].networkPassphrase);
 
 			const result = await server.sendTransaction(
-				TransactionBuilder.fromXDR(signedXdr, NETWORK.networkPassphrase),
+				TransactionBuilder.fromXDR(signedXdr, NETWORKS[NETWORK].networkPassphrase)
 			);
 
 			if (result.status !== "PENDING") {
@@ -243,7 +220,7 @@ export function usePayrollStream() {
 				throw new Error("No return value from contract call");
 			}
 
-			const streamId = scValToNative(returnValue) as number;
+			const streamId = scValToNative(returnValue).toString();
 			return streamId;
 		} catch (error) {
 			console.error("Error creating stream:", error);
@@ -253,28 +230,13 @@ export function usePayrollStream() {
 		}
 	};
 
-	const claimFromStream = async (_streamId: number) => {
-		// TODO: Implement claim functionality
-		throw new Error("Not implemented");
-	};
-
-	const cancelStream = async (_streamId: number) => {
-		// TODO: Implement cancel functionality
-		throw new Error("Not implemented");
-	};
-
-	const getClaimable = async (_streamId: number): Promise<number> => {
-		// TODO: Implement get claimable amount
-		return 0;
-	};
-
 	return {
-		streams: [] as Stream[],
+		streams: MOCK_STREAMS,
 		isLoading,
 		buildCreateStreamXdr,
 		createStream,
-		claimFromStream,
-		cancelStream,
-		getClaimable,
+		claimFromStream: async (_streamId: string) => {},
+		cancelStream: async (_streamId: string) => {},
+		getClaimable: async (_streamId: string): Promise<number> => 0,
 	};
 }
