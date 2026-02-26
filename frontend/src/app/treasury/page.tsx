@@ -1,8 +1,4 @@
-'use client'
-
-import SignerManagementPanel from '@/components/SignerManagementPanel'
-import { useFreighter } from '@/contexts/FreighterContext'
-import { Lock, ShieldAlert } from 'lucide-react'
+import TransactionHistory from "@/components/TransactionHistory";
 
 export default function TreasuryPage() {
   const { publicKey, isConnected } = useFreighter()
@@ -13,15 +9,19 @@ export default function TreasuryPage() {
   const isAdmin = isConnected && publicKey !== null
 
   return (
-    <div className="max-w-6xl mx-auto p-8 space-y-12">
-      <div>
-        <h1 className="text-3xl font-bold mb-6 flex items-center gap-3">
-          <span className="bg-blue-500/10 p-2 rounded-xl">🏦</span>
-          Treasury
-        </h1>
-        <p className="text-gray-400">
-          Multi-sig treasury management with configurable approval thresholds.
-        </p>
+    <div className="max-w-6xl mx-auto p-8">
+      <h1 className="text-3xl font-bold mb-6">🏦 Treasury</h1>
+      <p className="text-gray-400 mb-8">
+        Multi-sig treasury management with configurable approval thresholds.
+      </p>
+
+      <div className="mb-8">
+        <TransactionHistory />
+      </div>
+
+      {/* TODO: Implement Treasury Dashboard (see FE-6 to FE-10) */}
+      <div className="border border-dashed border-gray-600 rounded-xl p-12 text-center text-gray-500">
+        Treasury dashboard coming soon. See ISSUES-FRONTEND.md for contribution tasks.
       </div>
 
       {/* Treasury Stats Stub */}
