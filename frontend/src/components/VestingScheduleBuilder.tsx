@@ -1,244 +1,288 @@
 "use client"
 
-import React, { useState } from 'react'
-import { CheckCircle2, Loader2, Eye, EyeOff } from 'lucide-react'
-
-const LABEL_OPTIONS = ['Team', 'Advisor', 'Seed', 'Investor', 'Custom']
-const TOKEN_OPTIONS = ['XLM', 'USDC', 'yXLM']
+import React, { useState, useEffect } from 'react'
+import { Calendar, Clock, DollarSign, User, Coins, Zap, Timer, ArrowRight, Shield, ShieldCheck } from "lucide-react";
+import { useVesting } from "@/hooks/useVesting";
+import { StrKey } from "@stellar/stellar-sdk";
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { cn } from "@/lib/utils";
 
 interface VestingForm {
     beneficiary: string
     token: string
     totalAmount: string
     startDate: string
+    startTime: string
     cliffMonths: string
     vestingMonths: string
-    label: string
-    customLabel: string
+    revocable: boolean
 }
 
 const DEFAULT_FORM: VestingForm = {
     beneficiary: '',
-    token: 'XLM',
+    token: '',
     totalAmount: '',
     startDate: '',
+    startTime: '09:00',
     cliffMonths: '',
     vestingMonths: '',
-    label: 'Team',
-    customLabel: '',
+    revocable: true,
 }
 
-function formatDate(d: string) {
-    if (!d) return '—'
-    return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+interface VestingScheduleBuilderProps {
+	onSuccess?: () => void;
+	onError?: (error: string) => void;
 }
 
-function addMonths(dateStr: string, months: number) {
-    if (!dateStr) return '—'
-    const d = new Date(dateStr)
-    d.setMonth(d.getMonth() + months)
-    return formatDate(d.toISOString().split('T')[0])
-}
-
-type Status = 'idle' | 'submitting' | 'success'
-
-export function VestingScheduleBuilder() {
+export default function VestingScheduleBuilder({ onSuccess, onError }: VestingScheduleBuilderProps) {
+    const { createSchedule, isLoading } = useVesting()
     const [form, setForm] = useState<VestingForm>(DEFAULT_FORM)
-    const [preview, setPreview] = useState(false)
-    const [status, setStatus] = useState<Status>('idle')
+    const [errors, setErrors] = useState<Partial<VestingForm>>({})
 
-    const set = (field: keyof VestingForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-        setForm((f) => ({ ...f, [field]: e.target.value }))
+    const availableTokens = [
+		{
+			symbol: "USDC",
+			address: "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
+			name: "USD Coin",
+		},
+		{
+			symbol: "XLM",
+			address: "CDLZFA7IYMV2DKV2VEBZLZ6XVJDV6HJT4EHZM6LOJH6TQL6YN6MQIWCD",
+			name: "Stellar Lumens",
+		}
+	];
 
-    const cliffEnd = addMonths(form.startDate, Number(form.cliffMonths) || 0)
-    const vestEnd = addMonths(form.startDate, (Number(form.cliffMonths) || 0) + (Number(form.vestingMonths) || 0))
-    const effectiveLabel = form.label === 'Custom' ? form.customLabel || 'Custom' : form.label
+    const validateForm = (): boolean => {
+		const newErrors: Partial<VestingForm> = {};
 
-    const isValid =
-        form.beneficiary.length >= 10 &&
-        Number(form.totalAmount) > 0 &&
-        form.startDate &&
-        Number(form.cliffMonths) >= 0 &&
-        Number(form.vestingMonths) > 0
+		if (!form.beneficiary) {
+			newErrors.beneficiary = "Required";
+		} else if (!StrKey.isValidEd25519PublicKey(form.beneficiary)) {
+			newErrors.beneficiary = "Invalid Address";
+		}
+
+		if (!form.token) newErrors.token = "Required";
+
+		if (!form.totalAmount) {
+			newErrors.totalAmount = "Required";
+		} else if (parseFloat(form.totalAmount) <= 0) {
+			newErrors.totalAmount = "Must be > 0";
+		}
+
+		if (!form.startDate) newErrors.startDate = "Required";
+		if (!form.cliffMonths) newErrors.cliffMonths = "Required";
+		if (!form.vestingMonths) newErrors.vestingMonths = "Required";
+
+		setErrors(newErrors);
+		return Object.keys(newErrors).length === 0;
+	};
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!isValid) return
-        setStatus('submitting')
-        await new Promise((r) => setTimeout(r, 1600))
-        setStatus('success')
-        setTimeout(() => {
-            setForm(DEFAULT_FORM)
-            setPreview(false)
-            setStatus('idle')
-        }, 3500)
-    }
+        if (!validateForm()) return
 
-    if (status === 'success') {
-        return (
-            <div className="flex flex-col items-center gap-5 py-16 bg-stellar-surface border border-stellar-border rounded-xl">
-                <div className="relative">
-                    <CheckCircle2 className="h-16 w-16 text-green-400" />
-                    <div className="absolute inset-0 rounded-full bg-green-400/20 animate-ping" />
-                </div>
-                <p className="text-white text-xl font-bold">Vesting Schedule Created!</p>
-                <p className="text-gray-400 text-sm text-center max-w-xs">
-                    <span className="text-stellar-secondary font-semibold">{form.totalAmount} {form.token}</span> will vest to{' '}
-                    <span className="font-mono text-gray-300">{form.beneficiary.slice(0, 8)}…</span> with label{' '}
-                    <span className="text-stellar-primary">{effectiveLabel}</span>.
-                </p>
-            </div>
-        )
+        try {
+            const startDateTime = new Date(`${form.startDate}T${form.startTime}`)
+            const startTimeUnix = Math.floor(startDateTime.getTime() / 1000)
+            const cliffSeconds = parseInt(form.cliffMonths) * 30 * 24 * 3600
+            const totalSeconds = parseInt(form.vestingMonths) * 30 * 24 * 3600
+
+            await createSchedule(
+                form.beneficiary,
+                form.token,
+                form.totalAmount,
+                startTimeUnix,
+                cliffSeconds,
+                totalSeconds,
+                form.revocable
+            )
+
+            onSuccess?.()
+            setForm(DEFAULT_FORM)
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "Failed to create schedule"
+            onError?.(errorMessage)
+        }
     }
 
     return (
-        <div className="flex flex-col gap-6">
-            <form onSubmit={handleSubmit} className="bg-stellar-surface border border-stellar-border rounded-xl p-6 flex flex-col gap-5">
-
-                {/* Beneficiary */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1.5">Beneficiary Address</label>
-                    <input
-                        value={form.beneficiary}
-                        onChange={set('beneficiary')}
-                        placeholder="G... Stellar address"
-                        className="w-full bg-[#0D1117] border border-stellar-border rounded-lg px-4 py-2.5 text-white font-mono text-sm placeholder-gray-600 focus:outline-none focus:border-stellar-primary transition-colors"
-                    />
-                </div>
-
-                {/* Token + Amount */}
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1.5">Token</label>
-                        <select
-                            value={form.token}
-                            onChange={set('token')}
-                            className="w-full bg-[#0D1117] border border-stellar-border rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-stellar-primary transition-colors"
-                        >
-                            {TOKEN_OPTIONS.map((t) => <option key={t}>{t}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1.5">Total Amount</label>
+        <form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                            <User size={12} className="text-gray-400" />
+                            Beneficiary Address
+                        </label>
                         <input
-                            type="number"
-                            min="0"
-                            value={form.totalAmount}
-                            onChange={set('totalAmount')}
-                            placeholder="e.g. 10000"
-                            className="w-full bg-[#0D1117] border border-stellar-border rounded-lg px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-stellar-primary transition-colors"
+                            type="text"
+                            value={form.beneficiary}
+                            onChange={(e) => setForm(prev => ({ ...prev, beneficiary: e.target.value.toUpperCase() }))}
+                            placeholder="G..."
+                            className={cn(
+                                "w-full bg-gray-900/50 border rounded-2xl px-4 py-3 text-sm focus:border-purple-500 transition-all outline-none font-mono",
+                                errors.beneficiary ? "border-red-500/50" : "border-gray-800"
+                            )}
                         />
                     </div>
-                </div>
 
-                {/* Start Date */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1.5">Start Date</label>
-                    <input
-                        type="date"
-                        value={form.startDate}
-                        onChange={set('startDate')}
-                        className="w-full bg-[#0D1117] border border-stellar-border rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-stellar-primary transition-colors"
-                    />
-                </div>
-
-                {/* Cliff + Vesting Duration */}
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1.5">Cliff Duration (months)</label>
-                        <input
-                            type="number"
-                            min="0"
-                            value={form.cliffMonths}
-                            onChange={set('cliffMonths')}
-                            placeholder="e.g. 6"
-                            className="w-full bg-[#0D1117] border border-stellar-border rounded-lg px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-stellar-primary transition-colors"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1.5">Vesting Duration (months)</label>
-                        <input
-                            type="number"
-                            min="1"
-                            value={form.vestingMonths}
-                            onChange={set('vestingMonths')}
-                            placeholder="e.g. 24"
-                            className="w-full bg-[#0D1117] border border-stellar-border rounded-lg px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-stellar-primary transition-colors"
-                        />
-                    </div>
-                </div>
-
-                {/* Label */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1.5">Label</label>
-                    <div className="flex flex-wrap gap-2">
-                        {LABEL_OPTIONS.map((l) => (
-                            <button
-                                type="button"
-                                key={l}
-                                onClick={() => setForm((f) => ({ ...f, label: l }))}
-                                className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${form.label === l
-                                        ? 'border-stellar-primary bg-stellar-primary/20 text-white'
-                                        : 'border-stellar-border text-gray-400 hover:border-stellar-primary/50'
-                                    }`}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                                <Coins size={12} className="text-gray-400" />
+                                Token
+                            </label>
+                            <select
+                                value={form.token}
+                                onChange={(e) => setForm(prev => ({ ...prev, token: e.target.value }))}
+                                className={cn(
+                                    "w-full bg-gray-900/50 border rounded-2xl px-4 py-3 text-sm focus:border-purple-500 transition-all outline-none appearance-none",
+                                    errors.token ? "border-red-500/50" : "border-gray-800"
+                                )}
                             >
-                                {l}
-                            </button>
-                        ))}
+                                <option value="">Asset</option>
+                                {availableTokens.map((t) => (
+                                    <option key={t.address} value={t.address}>{t.symbol}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                                <DollarSign size={12} className="text-gray-400" />
+                                Amount
+                            </label>
+                            <input
+                                type="number"
+                                value={form.totalAmount}
+                                onChange={(e) => setForm(prev => ({ ...prev, totalAmount: e.target.value }))}
+                                placeholder="0.00"
+                                className={cn(
+                                    "w-full bg-gray-900/50 border rounded-2xl px-4 py-3 text-sm focus:border-purple-500 transition-all outline-none font-bold",
+                                    errors.totalAmount ? "border-red-500/50" : "border-gray-800"
+                                )}
+                            />
+                        </div>
                     </div>
-                    {form.label === 'Custom' && (
-                        <input
-                            value={form.customLabel}
-                            onChange={set('customLabel')}
-                            placeholder="Enter custom label"
-                            className="mt-3 w-full bg-[#0D1117] border border-stellar-border rounded-lg px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-stellar-primary transition-colors"
-                        />
-                    )}
+
+                    <div className="p-4 bg-purple-500/5 border border-purple-500/10 rounded-2xl space-y-3">
+                        <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-purple-400 flex items-center gap-2">
+                                <Shield size={12} />
+                                Revocable by Admin
+                            </label>
+                            <button 
+                                type="button"
+                                onClick={() => setForm(prev => ({ ...prev, revocable: !prev.revocable }))}
+                                className={cn(
+                                    "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                                    form.revocable ? "bg-purple-600" : "bg-gray-800"
+                                )}
+                            >
+                                <span className={cn(
+                                    "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                                    form.revocable ? "translate-x-4" : "translate-x-0"
+                                )} />
+                            </button>
+                        </div>
+                        <p className="text-[9px] text-gray-500 font-medium leading-relaxed">If enabled, the grantor can revoke the schedule and reclaim unvested tokens at any time.</p>
+                    </div>
                 </div>
 
-                {/* Preview Toggle */}
-                <button
-                    type="button"
-                    onClick={() => setPreview((p) => !p)}
-                    className="flex items-center gap-2 text-stellar-secondary text-sm hover:underline w-fit"
-                >
-                    {preview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    {preview ? 'Hide Preview' : 'Show Preview'}
-                </button>
-
-                {/* Preview Panel */}
-                {preview && (
-                    <div className="bg-[#0D1117] border border-stellar-border/60 rounded-xl p-5 grid grid-cols-2 gap-3 text-sm">
-                        {[
-                            ['Beneficiary', form.beneficiary ? `${form.beneficiary.slice(0, 12)}…` : '—'],
-                            ['Token', form.token],
-                            ['Total Amount', form.totalAmount ? `${form.totalAmount} ${form.token}` : '—'],
-                            ['Label', effectiveLabel],
-                            ['Start Date', formatDate(form.startDate)],
-                            ['Cliff End', cliffEnd],
-                            ['Fully Vested', vestEnd],
-                        ].map(([k, v]) => (
-                            <div key={k}>
-                                <p className="text-gray-500 text-xs uppercase tracking-wide">{k}</p>
-                                <p className="text-white font-medium mt-0.5">{v}</p>
-                            </div>
-                        ))}
+                <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                                <Calendar size={12} />
+                                Start Date
+                            </label>
+                            <input
+                                type="date"
+                                value={form.startDate}
+                                onChange={(e) => setForm(prev => ({ ...prev, startDate: e.target.value }))}
+                                className="w-full bg-gray-900/50 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white outline-none focus:border-purple-500"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                                <Clock size={12} />
+                                Time
+                            </label>
+                            <input
+                                type="time"
+                                value={form.startTime}
+                                onChange={(e) => setForm(prev => ({ ...prev, startTime: e.target.value }))}
+                                className="w-full bg-gray-900/50 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white outline-none focus:border-purple-500"
+                            />
+                        </div>
                     </div>
-                )}
 
-                {/* Submit */}
-                <button
-                    type="submit"
-                    disabled={!isValid || status === 'submitting'}
-                    className="flex items-center justify-center gap-2 py-3 rounded-lg bg-stellar-primary text-white font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
-                >
-                    {status === 'submitting' ? (
-                        <><Loader2 className="h-4 w-4 animate-spin" /> Creating Schedule…</>
-                    ) : (
-                        'Create Vesting Schedule'
-                    )}
-                </button>
-            </form>
-        </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                                <Timer size={12} />
+                                Cliff (Months)
+                            </label>
+                            <input
+                                type="number"
+                                value={form.cliffMonths}
+                                onChange={(e) => setForm(prev => ({ ...prev, cliffMonths: e.target.value }))}
+                                placeholder="e.g. 6"
+                                className="w-full bg-gray-900/50 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white outline-none focus:border-purple-500"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-2">
+                                <TrendingUp size={12} />
+                                Vesting (Months)
+                            </label>
+                            <input
+                                type="number"
+                                value={form.vestingMonths}
+                                onChange={(e) => setForm(prev => ({ ...prev, vestingMonths: e.target.value }))}
+                                placeholder="e.g. 24"
+                                className="w-full bg-gray-900/50 border border-gray-800 rounded-2xl px-3 py-2.5 text-xs text-white outline-none focus:border-purple-500"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="bg-gray-950/50 border border-gray-800 p-4 rounded-2xl space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Allocation Preview</span>
+                            <Badge variant="secondary" className="text-[8px] py-0 h-4">System Calculated</Badge>
+                        </div>
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-[11px] font-bold">
+                                <span className="text-gray-600">Initial Cliff</span>
+                                <span className="text-white">0.00 {form.token && availableTokens.find(t => t.address === form.token)?.symbol}</span>
+                            </div>
+                            <div className="flex justify-between text-[11px] font-bold">
+                                <span className="text-gray-600">Release Rate</span>
+                                <span className="text-white">Linear</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <Button 
+                type="submit" 
+                className="w-full rounded-2xl h-14 font-black uppercase tracking-[0.2em] text-xs shadow-xl shadow-purple-900/20 bg-purple-600 hover:bg-purple-500"
+                disabled={isLoading}
+            >
+                {isLoading ? (
+                    <div className="flex items-center gap-2">
+					    <div className="w-4 h-4 border-2 border-white border-t-white/30 rounded-full animate-spin" />
+                        Initializing Setup...
+                    </div>
+				) : (
+					<div className="flex items-center gap-2">
+						Initialize Vesting Schedule
+						<ShieldCheck size={16} />
+					</div>
+				)}
+            </Button>
+        </form>
     )
 }
