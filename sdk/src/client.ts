@@ -1,13 +1,13 @@
 import * as StellarSdk from '@stellar/stellar-sdk';
 
 export class OrbitPayClient {
-  private server: StellarSdk.horizon.Server;
+  private server: StellarSdk.Horizon.Server;
 
   constructor(serverUrl: string = 'https://horizon-testnet.stellar.org') {
-    this.server = new StellarSdk.horizon.Server(serverUrl);
+    this.server = new StellarSdk.Horizon.Server(serverUrl);
   }
 
-  public getServer(): StellarSdk.horizon.Server {
+  public getServer(): StellarSdk.Horizon.Server {
     return this.server;
   }
 }
