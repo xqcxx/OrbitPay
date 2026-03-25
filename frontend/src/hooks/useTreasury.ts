@@ -51,6 +51,7 @@ export function useTreasury() {
   const [proposals, setProposals] = useState<WithdrawalRequest[]>([]);
   const [threshold, setThreshold] = useState<number>(0);
   const [signers, setSigners] = useState<string[]>([]);
+  const [admin, setAdmin] = useState<string | null>(null);
   const [transactionHistory, setTransactionHistory] = useState<TreasuryTransactionHistory>({
     events: [],
     total: 0,
@@ -72,6 +73,17 @@ export function useTreasury() {
       );
       if (!('error' in thresholdResult)) {
         setThreshold(scValToNative(thresholdResult.result!.retval) as number);
+      }
+
+      // Get admin
+      const adminResult = await server.simulateTransaction(
+        new TransactionBuilder(await server.getAccount(DUMMY_ADDRESS), {
+          fee: '100',
+          networkPassphrase: NETWORK.networkPassphrase
+        }).addOperation(contract.call('get_admin')).build()
+      );
+      if (!('error' in adminResult)) {
+        setAdmin((scValToNative(adminResult.result!.retval) as any).toString());
       }
 
       // Get signers
@@ -326,6 +338,7 @@ export function useTreasury() {
   }, []);
 
   return {
+    admin,
     signers,
     threshold,
     proposals,
