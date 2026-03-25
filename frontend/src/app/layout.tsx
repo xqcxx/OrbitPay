@@ -16,6 +16,8 @@ export const metadata: Metadata = {
     'Manage payroll streaming, token vesting, and multi-sig treasury operations on-chain with Stellar Soroban smart contracts.',
 }
 
+import { ToastProvider } from '@/components/ui/Toast'
+
 export default function RootLayout({
   children,
 }: {
@@ -24,13 +26,14 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={inter.className}>
-        {/* TODO: Add FreighterProvider wrapper (see FE-2) */}
         <FreighterProvider>
-          <div className="flex min-h-screen flex-col bg-[rgb(var(--background))] text-[rgb(var(--foreground))] antialiased">
-            <Navbar />
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </div>
+          <ToastProvider>
+            <div className="flex min-h-screen flex-col bg-[rgb(var(--background))] text-[rgb(var(--foreground))] antialiased">
+              <Navbar />
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </div>
+          </ToastProvider>
         </FreighterProvider>
       </body>
     </html>
