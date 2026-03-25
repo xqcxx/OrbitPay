@@ -97,14 +97,14 @@ This document tracks the off-chain infrastructure tasks for the **OrbitPay** pro
 
 ### Issue #BK-7: Dashboard Analytics Endpoint
 **Category:** `[API]`
-**Status:** ❌ PENDING
+**Status:** ✅ COMPLETED
 **Priority:** Low
 **Description:** Aggregate analytics for the org dashboard.
 - **Tasks:**
-  - [ ] `GET /api/analytics/payroll` — total disbursed, active streams, burn rate.
-  - [ ] `GET /api/analytics/treasury` — balance over time, deposit/withdrawal volume.
-  - [ ] `GET /api/analytics/vesting` — total vesting value, upcoming cliffs.
-  - [ ] Return data in chart-friendly format (time series).
+  - [x] `GET /api/analytics/payroll` - total disbursed, active streams, burn rate. (@sshdopey - 2026-03-25 16:19 UTC)
+  - [x] `GET /api/analytics/treasury` - balance over time, deposit/withdrawal volume. (@sshdopey - 2026-03-25 16:19 UTC)
+  - [x] `GET /api/analytics/vesting` - total vesting value, upcoming cliffs. (@sshdopey - 2026-03-25 16:19 UTC)
+  - [x] Return data in chart-friendly format (time series). (@sshdopey - 2026-03-25 16:19 UTC)
 
 ---
 
