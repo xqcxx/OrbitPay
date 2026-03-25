@@ -81,6 +81,9 @@ OrbitPay/
 │       ├── components/               # Reusable UI components
 │       ├── hooks/                    # Contract interaction hooks
 │       └── lib/                      # Network & wallet utilities
+├── backend/                          # Backend scaffold and monitoring assets
+│   ├── README.md                     # Backend implementation contract
+│   └── monitoring/                   # Prometheus, alerting, Grafana templates
 ├── docs/                             # Issue trackers & guides
 │   ├── ISSUES-SMARTCONTRACT.md       # 25 smart contract issues
 │   ├── ISSUES-FRONTEND.md           # 25 frontend issues
@@ -123,6 +126,11 @@ Setup frontend:
 cd frontend
 npm install
 npm run dev
+```
+
+Backend monitoring scaffold:
+```bash
+cd backend/monitoring
 ```
 
 ## 📚 Documentation & Trackers
