@@ -35,3 +35,38 @@ model Vote {
   weight     Float
   createdAt  DateTime @default(now())
 }
+
+model Stream {
+  id               String       @id @default(uuid())
+  contractStreamId Int          @unique
+  sender           String
+  recipient        String
+  token            String
+  totalAmount      Float
+  claimedAmount    Float        @default(0)
+  startTime        DateTime
+  endTime          DateTime
+  status           String       @default("Active")
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  claimHistory     ClaimEvent[]
+}
+
+model ClaimEvent {
+  id        String   @id @default(uuid())
+  streamId  String
+  stream    Stream   @relation(fields: [streamId], references: [id])
+  amount    Float
+  timestamp DateTime @default(now())
+}
+
+model TreasuryEvent {
+  id              String   @id @default(uuid())
+  treasuryAddress String
+  eventType       String
+  address         String?
+  amount          Float?
+  proposalId      Int?
+  metadata        Json?
+  timestamp       DateTime @default(now())
+}
