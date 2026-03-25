@@ -1,0 +1,37 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+generator client {
+  provider = "prisma-client-js"
+}
+
+model VestingSchedule {
+  id          String   @id @default(uuid())
+  grantor     String
+  beneficiary String
+  amount      Float
+  status      String
+  startTime   DateTime @default(now())
+  endTime     DateTime
+}
+
+model Proposal {
+  id        String   @id @default(uuid())
+  proposer  String
+  title     String
+  amount    Float
+  status    String
+  votes     Vote[]
+  createdAt DateTime @default(now())
+}
+
+model Vote {
+  id         String   @id @default(uuid())
+  proposalId String
+  proposal   Proposal @relation(fields: [proposalId], references: [id])
+  voter      String
+  support    Boolean
+  weight     Float
+  createdAt  DateTime @default(now())
+}
