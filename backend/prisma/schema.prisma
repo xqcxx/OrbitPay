@@ -2,71 +2,122 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
 generator client {
   provider = "prisma-client-js"
 }
 
+model Organization {
+  id                String            @id @default(uuid())
+  admin             String
+  name              String
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  treasuryEvents    TreasuryEvent[]
+  streams           Stream[]
+  vestingSchedules  VestingSchedule[]
+  proposals         Proposal[]
+
+  @@map("organizations")
+}
+
 model VestingSchedule {
-  id          String   @id @default(uuid())
-  grantor     String
-  beneficiary String
-  amount      Float
-  status      String
-  startTime   DateTime @default(now())
-  endTime     DateTime
+  id             String        @id @default(uuid())
+  organizationId String?       @map("organization_id")
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  grantor        String
+  beneficiary    String
+  amount         Float
+  status         String
+  startTime      DateTime      @default(now()) @map("start_time")
+  endTime        DateTime      @map("end_time")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  @@index([organizationId, beneficiary])
+  @@map("vesting_schedules")
 }
 
 model Proposal {
-  id        String   @id @default(uuid())
-  proposer  String
-  title     String
-  amount    Float
-  status    String
-  votes     Vote[]
-  createdAt DateTime @default(now())
+  id             String        @id @default(uuid())
+  organizationId String?       @map("organization_id")
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  proposer       String
+  title          String
+  amount         Float
+  status         String
+  voteCount      Int           @default(0) @map("vote_count")
+  votes          Vote[]
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  @@index([organizationId, status])
+  @@map("proposals")
 }
 
 model Vote {
   id         String   @id @default(uuid())
-  proposalId String
-  proposal   Proposal @relation(fields: [proposalId], references: [id])
+  proposalId String   @map("proposal_id")
+  proposal   Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
   voter      String
   support    Boolean
   weight     Float
-  createdAt  DateTime @default(now())
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([proposalId, createdAt])
+  @@map("proposal_votes")
 }
 
 model Stream {
-  id               String       @id @default(uuid())
-  contractStreamId Int          @unique
+  id               String        @id @default(uuid())
+  organizationId   String?       @map("organization_id")
+  organization     Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  contractStreamId Int           @unique @map("contract_stream_id")
   sender           String
   recipient        String
   token            String
-  totalAmount      Float
-  claimedAmount    Float        @default(0)
-  startTime        DateTime
-  endTime          DateTime
-  status           String       @default("Active")
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  totalAmount      Float         @map("total_amount")
+  claimedAmount    Float         @default(0) @map("claimed_amount")
+  startTime        DateTime      @map("start_time")
+  endTime          DateTime      @map("end_time")
+  status           String        @default("active")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
   claimHistory     ClaimEvent[]
+
+  @@index([organizationId, status])
+  @@index([sender])
+  @@index([recipient])
+  @@map("streams")
 }
 
 model ClaimEvent {
   id        String   @id @default(uuid())
-  streamId  String
-  stream    Stream   @relation(fields: [streamId], references: [id])
+  streamId  String   @map("stream_id")
+  stream    Stream   @relation(fields: [streamId], references: [id], onDelete: Cascade)
   amount    Float
   timestamp DateTime @default(now())
+
+  @@index([streamId, timestamp])
+  @@map("claim_events")
 }
 
 model TreasuryEvent {
-  id              String   @id @default(uuid())
-  treasuryAddress String
-  eventType       String
+  id              String        @id @default(uuid())
+  organizationId  String?       @map("organization_id")
+  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  treasuryAddress String        @map("treasury_address")
+  eventType       String        @map("event_type")
   address         String?
   amount          Float?
-  proposalId      Int?
+  token           String?
+  txHash          String?       @unique @map("tx_hash")
+  proposalId      Int?          @map("proposal_id")
   metadata        Json?
-  timestamp       DateTime @default(now())
+  timestamp       DateTime      @default(now())
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  @@index([organizationId, timestamp])
+  @@index([treasuryAddress, timestamp])
+  @@map("treasury_events")
 }
