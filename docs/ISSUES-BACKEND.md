@@ -134,11 +134,11 @@ This document tracks the off-chain infrastructure tasks for the **OrbitPay** pro
 **Status:** ❌ PENDING
 **Priority:** Low
 - **Tasks:**
-  - [ ] Setup structured logging (JSON format).
-  - [ ] Add Prometheus metrics endpoint.
-  - [ ] Monitor indexer lag (time since last processed event).
-  - [ ] Alert on indexer failure or DB connection issues.
-  - [ ] Add Grafana dashboard template.
+  - [x] Setup structured logging (JSON format). (@sshdopey - 2026-03-25 17:03 UTC)
+  - [x] Add Prometheus metrics endpoint. (@sshdopey - 2026-03-25 17:03 UTC)
+  - [x] Monitor indexer lag (time since last processed event). (@sshdopey - 2026-03-25 17:03 UTC)
+  - [x] Alert on indexer failure or DB connection issues. (@sshdopey - 2026-03-25 17:03 UTC)
+  - [x] Add Grafana dashboard template. (@sshdopey - 2026-03-25 17:03 UTC)
 
 ---
 

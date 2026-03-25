@@ -1,0 +1,52 @@
+groups:
+  - name: orbitpay-backend
+    rules:
+      - alert: OrbitPayIndexerLagHigh
+        expr: orbitpay_indexer_lag_seconds > 300
+        for: 10m
+        labels:
+          severity: warning
+          service: indexer
+        annotations:
+          summary: OrbitPay indexer lag is above 5 minutes
+          description: The indexer has not processed new events fast enough for at least 10 minutes.
+
+      - alert: OrbitPayIndexerDown
+        expr: up{job="orbitpay-indexer"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: indexer
+        annotations:
+          summary: OrbitPay indexer is unreachable
+          description: Prometheus could not scrape the OrbitPay indexer for 5 minutes.
+
+      - alert: OrbitPayIndexerFailuresIncreasing
+        expr: increase(orbitpay_indexer_failures_total[15m]) > 3
+        for: 5m
+        labels:
+          severity: warning
+          service: indexer
+        annotations:
+          summary: OrbitPay indexer is reporting repeated failures
+          description: The indexer has recorded more than three failures in the last 15 minutes.
+
+      - alert: OrbitPayDatabaseDown
+        expr: orbitpay_db_connection_up == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: api
+        annotations:
+          summary: OrbitPay database connectivity is down
+          description: The backend database health probe has been failing for at least 5 minutes.
+
+      - alert: OrbitPayDatabaseProbeFailuresIncreasing
+        expr: increase(orbitpay_db_probe_failures_total[15m]) > 3
+        for: 5m
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: OrbitPay database probe failures are increasing
+          description: The backend has recorded more than three failed database probes in the last 15 minutes.
