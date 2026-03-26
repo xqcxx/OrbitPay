@@ -1,56 +1,162 @@
-# OrbitPay Backend Scaffold
+# OrbitPay Backend
 
-This directory holds the off-chain backend assets that are being added incrementally through the backend issue track.
+This directory contains the backend services for OrbitPay:
 
-## Monitoring Contract
+- `api`: Express analytics API backed by PostgreSQL and Redis
+- `indexer`: event indexer shell with its own health endpoint
 
-Issue `BK-10` establishes the monitoring contract before the API and indexer services land in the repo. The backend services should adopt the following observability surface:
+The backend stack is designed to run locally with Docker Compose from the
+repository root.
 
-- Structured logs emitted as JSON lines to stdout.
-- A Prometheus-compatible `/metrics` endpoint on each service.
-- An indexer lag gauge exposed in seconds.
-- A database connectivity health gauge exposed as `1` for healthy and `0` for unhealthy.
+## Services
 
-## Structured Logging Schema
+### API
 
-Every backend log line should be a single JSON object with these fields:
+The API service currently provides:
 
-```json
-{
-  "timestamp": "2026-03-25T17:00:00.000Z",
-  "level": "info",
-  "service": "api",
-  "event": "http_request_completed",
-  "message": "request handled",
-  "request_id": "req_01HXYZ",
-  "issue": "BK-10",
-  "metadata": {
-    "method": "GET",
-    "path": "/metrics",
-    "status_code": 200,
-    "duration_ms": 12
-  }
-}
+- `GET /health`
+- `GET /api/streams`
+- `GET /api/streams/:id`
+- `GET /api/treasury/:addr/events`
+- `GET /api/proposals`
+- `GET /api/proposals/:id`
+- `GET /api/proposals/:id/votes`
+- `GET /api/vesting`
+- `GET /api/vesting/:id/progress`
+
+Security hardening included in this backend shell:
+
+- rate limiting at `100 req/min` per IP
+- exponential backoff for repeated violations
+- `429 Too Many Requests` responses with `Retry-After`
+
+### Indexer
+
+The indexer service is a shell for the Soroban event poller. It currently:
+
+- starts as a separate service
+- performs a recurring placeholder poll loop
+- exposes `GET /health`
+- verifies PostgreSQL and Redis connectivity for stack health
+
+BK-2 can build directly on top of this entrypoint.
+
+## Environment
+
+For Docker Compose from the repository root:
+
+```bash
+cp .env.example .env
 ```
 
-Recommended log levels:
+For running the backend directly from this directory:
 
-- `debug` for local diagnostics
-- `info` for startup, requests, checkpoint updates, and routine task completion
-- `warn` for retryable failures and lag threshold breaches
-- `error` for sustained indexer failures, database probe failures, and process crashes
+```bash
+cp backend/.env.example backend/.env
+```
 
-## Required Metrics
+Key variables:
 
-The backend services should publish these metrics:
+- `DATABASE_URL`
+- `REDIS_URL`
+- `PORT`
+- `INDEXER_PORT`
+- `RATE_LIMIT_MAX_REQUESTS`
+- `RATE_LIMIT_WINDOW_SECONDS`
+- `RATE_LIMIT_BACKOFF_BASE_SECONDS`
+- `INDEXER_POLL_INTERVAL_MS`
 
-- `orbitpay_api_requests_total`
-- `orbitpay_api_request_duration_seconds`
-- `orbitpay_indexer_last_processed_timestamp_seconds`
-- `orbitpay_indexer_lag_seconds`
-- `orbitpay_indexer_failures_total`
-- `orbitpay_db_connection_up`
-- `orbitpay_db_probe_failures_total`
-- `orbitpay_process_uptime_seconds`
+## Docker Compose
 
-See [`backend/monitoring/README.md`](monitoring/README.md) for the Prometheus, alerting, and Grafana assets that consume these metrics.
+From the repository root:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+The stack includes:
+
+- API
+- Indexer
+- PostgreSQL
+- Redis
+
+Persistent data is stored in named Docker volumes:
+
+- `orbitpay_postgres_data`
+- `orbitpay_redis_data`
+
+## Local Backend Development
+
+Install dependencies:
+
+```bash
+cd backend
+npm install
+```
+
+Generate Prisma client:
+
+```bash
+npm run prisma:generate
+```
+
+Run the API:
+
+```bash
+npm run dev:api
+```
+
+Run the indexer:
+
+```bash
+npm run dev:indexer
+```
+
+Build the backend:
+
+```bash
+npm run build
+```
+
+## Database Schema
+
+Prisma models and migrations are included for these core tables:
+
+- `organizations`
+- `treasury_events`
+- `streams`
+- `vesting_schedules`
+- `proposals`
+
+Supporting tables are also included for relational data:
+
+- `proposal_votes`
+- `claim_events`
+
+Apply migrations:
+
+```bash
+npm run prisma:migrate:deploy
+```
+
+## Health Checks
+
+Service health endpoints:
+
+- API: `http://localhost:3001/health`
+- Indexer: `http://localhost:3002/health`
+
+Both endpoints verify:
+
+- PostgreSQL connectivity
+- Redis connectivity
+- service uptime
+
+## Notes
+
+- Docker Compose health checks are configured for all four services.
+- The indexer is intentionally a shell in this branch so BK-2 can add real
+  Soroban polling without reworking the service layout.
+- The API and indexer share the same backend image and Prisma schema.

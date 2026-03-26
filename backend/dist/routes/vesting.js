@@ -1,16 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
-const client_1 = require("@prisma/client");
+const prisma_1 = require("../lib/prisma");
 const router = (0, express_1.Router)();
-const prisma = new client_1.PrismaClient();
 router.get('/', async (req, res) => {
     try {
         const { beneficiary } = req.query;
         if (!beneficiary) {
             return res.status(400).json({ error: 'beneficiary query parameter is required' });
         }
-        const schedules = await prisma.vestingSchedule.findMany({
+        const schedules = await prisma_1.prisma.vestingSchedule.findMany({
             where: { beneficiary: String(beneficiary) },
         });
         res.json(schedules);
@@ -22,7 +21,7 @@ router.get('/', async (req, res) => {
 router.get('/:id/progress', async (req, res) => {
     try {
         const { id } = req.params;
-        const schedule = await prisma.vestingSchedule.findUnique({
+        const schedule = await prisma_1.prisma.vestingSchedule.findUnique({
             where: { id },
         });
         if (!schedule) {

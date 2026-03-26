@@ -14,20 +14,20 @@ This document tracks the off-chain infrastructure tasks for the **OrbitPay** pro
 
 ### Issue #BK-1: API Shell & Database Setup
 **Category:** `[INFRA]`
-**Status:** ❌ PENDING
+**Status:** ✅ COMPLETED
 **Priority:** Critical
 **Description:** Bootstrap the backend service that indexes events and serves analytics.
 - **Tasks:**
-  - [ ] Initialize Python (FastAPI) or Node.js (NestJS/Express) project.
-  - [ ] Setup PostgreSQL database with Docker Compose.
-  - [ ] Design DB schema:
-    - `organizations` table (admin, name, created_at)
-    - `treasury_events` table (type, amount, token, tx_hash, timestamp)
-    - `streams` table (sender, recipient, amount, status, timestamps)
-    - `vesting_schedules` table (grantor, beneficiary, amounts, status)
-    - `proposals` table (proposer, title, amount, status, votes)
-  - [ ] Create database migrations.
-  - [ ] Setup health check endpoint `GET /health`.
+  - [x] Initialize Python (FastAPI) or Node.js (NestJS/Express) project. (@Chucks1093 - 2026-03-25 23:26 UTC)
+  - [x] Setup PostgreSQL database with Docker Compose. (@Chucks1093 - 2026-03-25 23:26 UTC)
+  - [x] Design DB schema:
+    - `organizations` table (admin, name, created_at) (@Chucks1093 - 2026-03-25 23:26 UTC)
+    - `treasury_events` table (type, amount, token, tx_hash, timestamp) (@Chucks1093 - 2026-03-25 23:26 UTC)
+    - `streams` table (sender, recipient, amount, status, timestamps) (@Chucks1093 - 2026-03-25 23:26 UTC)
+    - `vesting_schedules` table (grantor, beneficiary, amounts, status) (@Chucks1093 - 2026-03-25 23:26 UTC)
+    - `proposals` table (proposer, title, amount, status, votes) (@Chucks1093 - 2026-03-25 23:26 UTC)
+  - [x] Create database migrations. (@Chucks1093 - 2026-03-25 23:26 UTC)
+  - [x] Setup health check endpoint `GET /health`. (@Chucks1093 - 2026-03-25 23:26 UTC)
 
 ### Issue #BK-2: Soroban Event Indexer
 **Category:** `[INFRA]`
@@ -56,15 +56,15 @@ This document tracks the off-chain infrastructure tasks for the **OrbitPay** pro
 
 ### Issue #BK-4: Docker Compose Full Stack
 **Category:** `[INFRA]`
-**Status:** ❌ PENDING
+**Status:** ✅ COMPLETED
 **Priority:** Medium
 **Description:** Create a Docker Compose setup for the entire backend stack.
 - **Tasks:**
-  - [ ] `docker-compose.yml` with: API, Indexer, PostgreSQL, Redis.
-  - [ ] Environment variable configuration (`.env.example`).
-  - [ ] Volume mounts for persistent data.
-  - [ ] Health checks for all services.
-  - [ ] Add `README` for backend setup instructions.
+  - [x] `docker-compose.yml` with: API, Indexer, PostgreSQL, Redis. (@Chucks1093 - 2026-03-25 23:26 UTC)
+  - [x] Environment variable configuration (`.env.example`). (@Chucks1093 - 2026-03-25 23:26 UTC)
+  - [x] Volume mounts for persistent data. (@Chucks1093 - 2026-03-25 23:26 UTC)
+  - [x] Health checks for all services. (@Chucks1093 - 2026-03-25 23:26 UTC)
+  - [x] Add `README` for backend setup instructions. (@Chucks1093 - 2026-03-25 23:26 UTC)
 
 ---
 
@@ -112,12 +112,12 @@ This document tracks the off-chain infrastructure tasks for the **OrbitPay** pro
 
 ### Issue #BK-8: API Rate Limiting
 **Category:** `[SECURITY]`
-**Status:** ❌ PENDING
+**Status:** ✅ COMPLETED
 **Priority:** Medium
 - **Tasks:**
-  - [ ] Implement rate limiting middleware (100 req/min per IP).
-  - [ ] Add exponential backoff for repeated violations.
-  - [ ] Return `429 Too Many Requests` with retry-after header.
+  - [x] Implement rate limiting middleware (100 req/min per IP). (@Chucks1093 - 2026-03-25 23:26 UTC)
+  - [x] Add exponential backoff for repeated violations. (@Chucks1093 - 2026-03-25 23:26 UTC)
+  - [x] Return `429 Too Many Requests` with retry-after header. (@Chucks1093 - 2026-03-25 23:26 UTC)
 
 ### Issue #BK-9: API Key Authentication
 **Category:** `[SECURITY]`

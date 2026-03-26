@@ -1,8 +1,7 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // GET /api/streams?sender={addr} or ?recipient={addr}
 router.get('/streams', async (req, res) => {
@@ -12,7 +11,7 @@ router.get('/streams', async (req, res) => {
     const skip = cursor ? 1 : 0;
     const cursorObj = cursor ? { id: String(cursor) } : undefined;
 
-    const where: any = {};
+    const where: Record<string, string> = {};
     if (sender) where.sender = String(sender);
     if (recipient) where.recipient = String(recipient);
 
