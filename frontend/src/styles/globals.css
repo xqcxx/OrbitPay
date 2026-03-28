@@ -32,6 +32,7 @@
 
 body {
   color: rgb(var(--foreground));
+  min-height: 100dvh;
   background:
     radial-gradient(
       circle at top right,
@@ -47,4 +48,15 @@ body {
 
 a {
   @apply transition-colors;
+}
+
+button,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+@supports (padding: max(0px)) {
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
 }
