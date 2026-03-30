@@ -1,5 +1,10 @@
 # OrbitPay
 
+[![Rust CI](https://github.com/xqcxx/OrbitPay/actions/workflows/rust.yml/badge.svg)](https://github.com/xqcxx/OrbitPay/actions/workflows/rust.yml)
+[![Frontend CI](https://github.com/xqcxx/OrbitPay/actions/workflows/frontend.yml/badge.svg)](https://github.com/xqcxx/OrbitPay/actions/workflows/frontend.yml)
+[![Docs](https://github.com/xqcxx/OrbitPay/actions/workflows/docs.yml/badge.svg)](https://github.com/xqcxx/OrbitPay/actions/workflows/docs.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 Decentralized Payroll, Vesting & Treasury Protocol on Stellar Soroban.
 
 ```
