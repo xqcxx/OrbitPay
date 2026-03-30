@@ -1,0 +1,103 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/**'
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'contracts/**'
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+
+# Allow one concurrent deployment; cancel older in-progress runs.
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-docs:
+    name: Build cargo doc
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            contracts/target
+          key: ${{ runner.os }}-cargo-docs-${{ hashFiles('contracts/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-docs-
+
+      - name: Generate API docs
+        # --no-deps avoids generating docs for every transitive dependency.
+        # RUSTDOCFLAGS enables intra-doc links and injects the custom CSS.
+        run: |
+          RUSTDOCFLAGS="--enable-index-page -Zunstable-options \
+            --html-before-content ../docs/rustdoc/header.html \
+            --html-after-content ../docs/rustdoc/footer.html" \
+          cargo +nightly doc --no-deps --all 2>/dev/null || \
+          cargo doc --no-deps --all
+
+      - name: Copy architecture docs into doc output
+        run: |
+          cp -r ../docs/architecture target/doc/architecture || true
+
+      - name: Upload docs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbitpay-docs
+          path: contracts/target/doc
+          retention-days: 7
+
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    # Only deploy from main branch pushes, not PRs.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build-docs
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download docs artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: orbitpay-docs
+          path: _site
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

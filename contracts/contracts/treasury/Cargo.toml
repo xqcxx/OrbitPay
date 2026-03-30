@@ -2,6 +2,12 @@
 name = "treasury"
 version = "0.1.0"
 edition = "2021"
+description = "OrbitPay multi-signature treasury vault contract"
+documentation = "https://xqcxx.github.io/OrbitPay/treasury"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--enable-index-page", "-Zunstable-options"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

@@ -2,6 +2,12 @@
 name = "vesting"
 version = "0.1.0"
 edition = "2021"
+description = "OrbitPay cliff + linear token vesting contract"
+documentation = "https://xqcxx.github.io/OrbitPay/vesting"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--enable-index-page", "-Zunstable-options"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

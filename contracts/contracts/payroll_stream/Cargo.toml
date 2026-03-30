@@ -2,6 +2,12 @@
 name = "payroll_stream"
 version = "0.1.0"
 edition = "2021"
+description = "OrbitPay continuous payroll streaming contract"
+documentation = "https://xqcxx.github.io/OrbitPay/payroll_stream"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--enable-index-page", "-Zunstable-options"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
