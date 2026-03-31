@@ -1,8 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useGovernance, type Proposal, type VoteChoice } from '@/hooks/useGovernance'
-import { CheckCircle, Clock, XCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
+import { CheckCircle, Clock, XCircle, Loader2, ChevronDown, ChevronUp, Plus, Eye } from 'lucide-react'
+import ProposalCreationForm from '@/components/ProposalCreationForm'
+import ProposalDetailModal from '@/components/ProposalDetailModal'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -35,6 +37,40 @@ function formatAmount(raw: bigint, decimals = 7) {
 
 function isExpired(endTime: number) {
   return Date.now() / 1000 > endTime
+}
+
+function CountdownTimer({ endTime }: { endTime: number }) {
+  const [timeLeft, setTimeLeft] = useState('')
+
+  useEffect(() => {
+    const updateTimer = () => {
+      const now = Date.now() / 1000
+      const diff = endTime - now
+
+      if (diff <= 0) {
+        setTimeLeft('Ended')
+        return
+      }
+
+      const days = Math.floor(diff / 86400)
+      const hours = Math.floor((diff % 86400) / 3600)
+      const minutes = Math.floor((diff % 3600) / 60)
+
+      if (days > 0) {
+        setTimeLeft(`${days}d ${hours}h`)
+      } else if (hours > 0) {
+        setTimeLeft(`${hours}h ${minutes}m`)
+      } else {
+        setTimeLeft(`${minutes}m`)
+      }
+    }
+
+    updateTimer()
+    const interval = setInterval(updateTimer, 60000) // Update every minute
+    return () => clearInterval(interval)
+  }, [endTime])
+
+  return <span className="font-mono text-sm">{timeLeft}</span>
 }
 
 // ── VoteTally ─────────────────────────────────────────────────────────────────
@@ -79,12 +115,14 @@ function ProposalCard({
   isConnected,
   onVote,
   isVoting,
+  onViewDetails,
 }: {
   proposal: Proposal
   publicKey: string | null
   isConnected: boolean
   onVote: (id: number, choice: VoteChoice) => Promise<void>
   isVoting: boolean
+  onViewDetails: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -134,7 +172,7 @@ function ProposalCard({
           </div>
           <button
             type="button"
-            onClick={() => setExpanded((v) => !v)}
+            onClick={() => setExpanded((v: boolean) => !v)}
             className="text-gray-400 hover:text-white transition-colors self-start sm:self-auto"
             aria-label={expanded ? 'Collapse' : 'Expand'}
           >
@@ -156,10 +194,19 @@ function ProposalCard({
           {!expired && proposal.status === 'Active' && (
             <span className="flex items-center gap-1">
               <Clock size={13} className="text-sky-400" />
-              Ends {new Date(proposal.endTime * 1000).toLocaleString()}
+              <CountdownTimer endTime={proposal.endTime} />
             </span>
           )}
         </div>
+
+        <button
+          type="button"
+          onClick={onViewDetails}
+          className="mt-3 flex items-center gap-2 text-sm text-sky-400 hover:text-sky-300 transition-colors"
+        >
+          <Eye size={14} />
+          View Details
+        </button>
       </div>
 
       {/* Vote tally — always visible */}
@@ -234,6 +281,17 @@ export default function GovernancePage() {
 
   const [votingId, setVotingId] = useState<number | null>(null)
   const [voteError, setVoteError] = useState<string | null>(null)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [createSuccess, setCreateSuccess] = useState<string | null>(null)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<Proposal['status'] | 'All'>('All')
+  const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null)
+
+  // Filter proposals by status
+  const filteredProposals = useMemo(() => {
+    if (statusFilter === 'All') return proposals
+    return proposals.filter((p) => p.status === statusFilter)
+  }, [proposals, statusFilter])
 
   const handleVote = async (proposalId: number, choice: VoteChoice) => {
     setVotingId(proposalId)
@@ -247,9 +305,28 @@ export default function GovernancePage() {
     }
   }
 
+  const handleCreateSuccess = (proposalId: number) => {
+    setCreateSuccess(`Proposal #${proposalId} created successfully!`)
+    setShowCreateForm(false)
+    setTimeout(() => setCreateSuccess(null), 5000)
+  }
+
+  const handleCreateError = (error: string) => {
+    setCreateError(error)
+    setTimeout(() => setCreateError(null), 5000)
+  }
+
   const activeCount    = proposals.filter((p) => p.status === 'Active').length
   const approvedCount  = proposals.filter((p) => p.status === 'Approved').length
   const executedCount  = proposals.filter((p) => p.status === 'Executed').length
+
+  const filterTabs: Array<{ label: string; value: Proposal['status'] | 'All'; count?: number }> = [
+    { label: 'All', value: 'All', count: proposals.length },
+    { label: 'Active', value: 'Active', count: activeCount },
+    { label: 'Approved', value: 'Approved', count: approvedCount },
+    { label: 'Rejected', value: 'Rejected', count: proposals.filter((p) => p.status === 'Rejected').length },
+    { label: 'Executed', value: 'Executed', count: executedCount },
+  ]
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
@@ -299,6 +376,45 @@ export default function GovernancePage() {
         ))}
       </div>
 
+      {/* Create Proposal Button */}
+      <div className="mb-6">
+        <button
+          type="button"
+          onClick={() => setShowCreateForm(!showCreateForm)}
+          disabled={!isConnected}
+          className="flex items-center gap-2 px-5 py-3 bg-sky-600 hover:bg-sky-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors"
+        >
+          <Plus size={18} />
+          {showCreateForm ? 'Cancel' : 'Create New Proposal'}
+        </button>
+      </div>
+
+      {/* Create Form */}
+      {showCreateForm && (
+        <div className="mb-8">
+          <ProposalCreationForm
+            onSuccess={handleCreateSuccess}
+            onError={handleCreateError}
+          />
+        </div>
+      )}
+
+      {/* Success message */}
+      {createSuccess && (
+        <div className="mb-6 p-4 bg-green-900/40 border border-green-700/50 rounded-xl text-green-300 text-sm flex items-start gap-2">
+          <CheckCircle size={16} className="shrink-0 mt-0.5" />
+          {createSuccess}
+        </div>
+      )}
+
+      {/* Create error */}
+      {createError && (
+        <div className="mb-6 p-4 bg-red-900/40 border border-red-700/50 rounded-xl text-red-300 text-sm flex items-start gap-2">
+          <XCircle size={16} className="shrink-0 mt-0.5" />
+          {createError}
+        </div>
+      )}
+
       {/* Vote error */}
       {voteError && (
         <div className="mb-6 p-4 bg-red-900/40 border border-red-700/50 rounded-xl text-red-300 text-sm flex items-start gap-2">
@@ -306,6 +422,24 @@ export default function GovernancePage() {
           {voteError}
         </div>
       )}
+
+      {/* Filter Tabs */}
+      <div className="mb-6 flex flex-wrap gap-2">
+        {filterTabs.map(({ label, value, count }) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setStatusFilter(value)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+              statusFilter === value
+                ? 'bg-sky-600 text-white'
+                : 'bg-gray-800/40 text-gray-400 hover:bg-gray-800 hover:text-white border border-gray-700/50'
+            }`}
+          >
+            {label} {count !== undefined && `(${count})`}
+          </button>
+        ))}
+      </div>
 
       {/* Loading */}
       {isLoading && proposals.length === 0 && (
@@ -323,16 +457,18 @@ export default function GovernancePage() {
       )}
 
       {/* Empty state */}
-      {!isLoading && proposals.length === 0 && !error && (
+      {!isLoading && filteredProposals.length === 0 && !error && (
         <div className="border border-dashed border-gray-600 rounded-xl p-12 text-center text-gray-500">
-          No proposals yet.
-          {!isConnected && ' Connect your wallet to create a proposal.'}
+          {statusFilter === 'All' 
+            ? 'No proposals yet.'
+            : `No ${statusFilter.toLowerCase()} proposals.`}
+          {!isConnected && statusFilter === 'All' && ' Connect your wallet to create a proposal.'}
         </div>
       )}
 
       {/* Proposal list */}
       <div className="space-y-4">
-        {proposals.map((proposal) => (
+        {filteredProposals.map((proposal) => (
           <ProposalCard
             key={proposal.id}
             proposal={proposal}
@@ -340,9 +476,33 @@ export default function GovernancePage() {
             isConnected={isConnected}
             onVote={handleVote}
             isVoting={votingId === proposal.id}
+            onViewDetails={() => setSelectedProposal(proposal)}
           />
         ))}
       </div>
+
+      {/* Detail Modal */}
+      {selectedProposal && (
+        <ProposalDetailModal
+          proposal={selectedProposal}
+          isOpen={!!selectedProposal}
+          onClose={() => setSelectedProposal(null)}
+          onVote={async (choice) => {
+            await handleVote(selectedProposal.id, choice)
+          }}
+          canVote={
+            isConnected &&
+            selectedProposal.status === 'Active' &&
+            !isExpired(selectedProposal.endTime)
+          }
+          userVote={
+            publicKey
+              ? selectedProposal.votes.find((v) => v.voter === publicKey)?.choice
+              : undefined
+          }
+          isVoting={votingId === selectedProposal.id}
+        />
+      )}
     </div>
   )
 }
