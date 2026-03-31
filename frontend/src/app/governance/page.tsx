@@ -272,20 +272,28 @@ export default function GovernancePage() {
   const {
     proposals,
     config,
+    members,
     isLoading,
     error,
     isConnected,
     publicKey,
     vote,
+    execute,
   } = useGovernance()
 
   const [votingId, setVotingId] = useState<number | null>(null)
+  const [executingId, setExecutingId] = useState<number | null>(null)
   const [voteError, setVoteError] = useState<string | null>(null)
+  const [executeError, setExecuteError] = useState<string | null>(null)
+  const [executeSuccess, setExecuteSuccess] = useState<string | null>(null)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [createSuccess, setCreateSuccess] = useState<string | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<Proposal['status'] | 'All'>('All')
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null)
+
+  // Check if current user is an admin (governance member)
+  const isAdmin = publicKey ? members.includes(publicKey) : false
 
   // Filter proposals by status
   const filteredProposals = useMemo(() => {
@@ -302,6 +310,23 @@ export default function GovernancePage() {
       setVoteError(err instanceof Error ? err.message : String(err))
     } finally {
       setVotingId(null)
+    }
+  }
+
+  const handleExecute = async (proposalId: number) => {
+    setExecutingId(proposalId)
+    setExecuteError(null)
+    setExecuteSuccess(null)
+    try {
+      await execute(proposalId)
+      setExecuteSuccess(`Proposal #${proposalId} executed successfully!`)
+      setTimeout(() => setExecuteSuccess(null), 5000)
+      setSelectedProposal(null)
+    } catch (err) {
+      setExecuteError(err instanceof Error ? err.message : String(err))
+      setTimeout(() => setExecuteError(null), 5000)
+    } finally {
+      setExecutingId(null)
     }
   }
 
@@ -423,6 +448,22 @@ export default function GovernancePage() {
         </div>
       )}
 
+      {/* Execute success */}
+      {executeSuccess && (
+        <div className="mb-6 p-4 bg-purple-900/40 border border-purple-700/50 rounded-xl text-purple-300 text-sm flex items-start gap-2">
+          <CheckCircle size={16} className="shrink-0 mt-0.5" />
+          {executeSuccess}
+        </div>
+      )}
+
+      {/* Execute error */}
+      {executeError && (
+        <div className="mb-6 p-4 bg-red-900/40 border border-red-700/50 rounded-xl text-red-300 text-sm flex items-start gap-2">
+          <XCircle size={16} className="shrink-0 mt-0.5" />
+          {executeError}
+        </div>
+      )}
+
       {/* Filter Tabs */}
       <div className="mb-6 flex flex-wrap gap-2">
         {filterTabs.map(({ label, value, count }) => (
@@ -490,17 +531,20 @@ export default function GovernancePage() {
           onVote={async (choice) => {
             await handleVote(selectedProposal.id, choice)
           }}
+          onExecute={handleExecute}
           canVote={
             isConnected &&
             selectedProposal.status === 'Active' &&
             !isExpired(selectedProposal.endTime)
           }
+          canExecute={isAdmin && isConnected}
           userVote={
             publicKey
               ? selectedProposal.votes.find((v) => v.voter === publicKey)?.choice
               : undefined
           }
           isVoting={votingId === selectedProposal.id}
+          isExecuting={executingId === selectedProposal.id}
         />
       )}
     </div>
