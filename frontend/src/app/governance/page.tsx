@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useGovernance, type Proposal, type VoteChoice } from '@/hooks/useGovernance'
-import { CheckCircle, Clock, XCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
+import { CheckCircle, Clock, XCircle, Loader2, ChevronDown, ChevronUp, Plus } from 'lucide-react'
+import ProposalCreationForm from '@/components/ProposalCreationForm'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -234,6 +235,9 @@ export default function GovernancePage() {
 
   const [votingId, setVotingId] = useState<number | null>(null)
   const [voteError, setVoteError] = useState<string | null>(null)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [createSuccess, setCreateSuccess] = useState<string | null>(null)
+  const [createError, setCreateError] = useState<string | null>(null)
 
   const handleVote = async (proposalId: number, choice: VoteChoice) => {
     setVotingId(proposalId)
@@ -245,6 +249,17 @@ export default function GovernancePage() {
     } finally {
       setVotingId(null)
     }
+  }
+
+  const handleCreateSuccess = (proposalId: number) => {
+    setCreateSuccess(`Proposal #${proposalId} created successfully!`)
+    setShowCreateForm(false)
+    setTimeout(() => setCreateSuccess(null), 5000)
+  }
+
+  const handleCreateError = (error: string) => {
+    setCreateError(error)
+    setTimeout(() => setCreateError(null), 5000)
   }
 
   const activeCount    = proposals.filter((p) => p.status === 'Active').length
@@ -298,6 +313,45 @@ export default function GovernancePage() {
           </div>
         ))}
       </div>
+
+      {/* Create Proposal Button */}
+      <div className="mb-6">
+        <button
+          type="button"
+          onClick={() => setShowCreateForm(!showCreateForm)}
+          disabled={!isConnected}
+          className="flex items-center gap-2 px-5 py-3 bg-sky-600 hover:bg-sky-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors"
+        >
+          <Plus size={18} />
+          {showCreateForm ? 'Cancel' : 'Create New Proposal'}
+        </button>
+      </div>
+
+      {/* Create Form */}
+      {showCreateForm && (
+        <div className="mb-8">
+          <ProposalCreationForm
+            onSuccess={handleCreateSuccess}
+            onError={handleCreateError}
+          />
+        </div>
+      )}
+
+      {/* Success message */}
+      {createSuccess && (
+        <div className="mb-6 p-4 bg-green-900/40 border border-green-700/50 rounded-xl text-green-300 text-sm flex items-start gap-2">
+          <CheckCircle size={16} className="shrink-0 mt-0.5" />
+          {createSuccess}
+        </div>
+      )}
+
+      {/* Create error */}
+      {createError && (
+        <div className="mb-6 p-4 bg-red-900/40 border border-red-700/50 rounded-xl text-red-300 text-sm flex items-start gap-2">
+          <XCircle size={16} className="shrink-0 mt-0.5" />
+          {createError}
+        </div>
+      )}
 
       {/* Vote error */}
       {voteError && (
