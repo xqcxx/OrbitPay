@@ -4,7 +4,8 @@ import { VestingScheduleBuilder } from '@/components/VestingScheduleBuilder'
 import React, { useState } from 'react';
 import ClaimModal from '@/components/ClaimModal';
 import VestingTimeline from '@/components/VestingTimeline';
-import { CheckCircle2 } from 'lucide-react';
+import GrantorPanel from '@/components/GrantorPanel';
+import { CheckCircle2, User, Shield } from 'lucide-react';
 
 interface MockSchedule {
   id: number;
@@ -59,6 +60,7 @@ const MOCK_SCHEDULES: MockSchedule[] = [
 ];
 
 export default function VestingPage() {
+  const [activeTab, setActiveTab] = useState<'beneficiary' | 'grantor'>('beneficiary');
   const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -86,53 +88,86 @@ export default function VestingPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {MOCK_SCHEDULES.map((schedule) => (
-          <div key={schedule.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-6 hover:border-purple-500/30 transition-all group">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-lg font-bold text-white group-hover:text-purple-400 transition-colors">{schedule.label}</h3>
-                <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded ${schedule.status === 'Active' ? 'bg-green-900/30 text-green-500' : 'bg-orange-900/30 text-orange-500'
-                  }`}>
-                  {schedule.status}
-                </span>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-black text-white">{schedule.total_amount}</p>
-                <p className="text-xs text-gray-500 uppercase">{schedule.token}</p>
-              </div>
-            </div>
+      {/* Tab Navigation */}
+      <div className="mb-6 bg-gray-900 border border-gray-800 rounded-2xl p-2 inline-flex gap-2">
+        <button
+          onClick={() => setActiveTab('beneficiary')}
+          className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'beneficiary'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50'
+              : 'text-gray-400 hover:text-white hover:bg-gray-800'
+          }`}
+        >
+          <User className="w-4 h-4" />
+          My Vesting
+        </button>
+        <button
+          onClick={() => setActiveTab('grantor')}
+          className={`px-6 py-3 rounded-xl font-medium transition-all flex items-center gap-2 ${
+            activeTab === 'grantor'
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/50'
+              : 'text-gray-400 hover:text-white hover:bg-gray-800'
+          }`}
+        >
+          <Shield className="w-4 h-4" />
+          Grantor Dashboard
+        </button>
+      </div>
 
-            <div className="space-y-6">
-              <VestingTimeline
-                startTime={schedule.startTime}
-                cliffDuration={schedule.cliffDuration}
-                totalDuration={schedule.totalDuration}
-                totalAmount={schedule.totalAmountBig}
-                vestedAmount={schedule.vestedAmountBig}
-                claimedAmount={schedule.claimedAmountBig}
-              />
+      {/* Tab Content */}
+      {activeTab === 'beneficiary' ? (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {MOCK_SCHEDULES.map((schedule) => (
+              <div key={schedule.id} className="bg-gray-900 border border-gray-800 rounded-2xl p-6 hover:border-purple-500/30 transition-all group">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-white group-hover:text-purple-400 transition-colors">{schedule.label}</h3>
+                    <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded ${schedule.status === 'Active' ? 'bg-green-900/30 text-green-500' : 'bg-orange-900/30 text-orange-500'
+                      }`}>
+                      {schedule.status}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-black text-white">{schedule.total_amount}</p>
+                    <p className="text-xs text-gray-500 uppercase">{schedule.token}</p>
+                  </div>
+                </div>
 
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Claimable</span>
-                <span className="text-purple-400 font-bold">{schedule.claimable_amount} {schedule.token}</span>
+                <div className="space-y-6">
+                  <VestingTimeline
+                    startTime={schedule.startTime}
+                    cliffDuration={schedule.cliffDuration}
+                    totalDuration={schedule.totalDuration}
+                    totalAmount={schedule.totalAmountBig}
+                    vestedAmount={schedule.vestedAmountBig}
+                    claimedAmount={schedule.claimedAmountBig}
+                  />
+
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Claimable</span>
+                    <span className="text-purple-400 font-bold">{schedule.claimable_amount} {schedule.token}</span>
+                  </div>
+
+                  <button
+                    onClick={() => setSelectedScheduleId(schedule.id)}
+                    className="w-full py-3 bg-gray-800 hover:bg-purple-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-purple-900/10"
+                  >
+                    View & Claim
+                  </button>
+                </div>
               </div>
-
-              <button
-                onClick={() => setSelectedScheduleId(schedule.id)}
-                className="w-full py-3 bg-gray-800 hover:bg-purple-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-purple-900/10"
-              >
-                View & Claim
-              </button>
-            </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Empty State Mock */}
-      <div className="mt-12 border border-dashed border-gray-800 rounded-2xl p-12 text-center">
-        <p className="text-gray-600">No more vesting schedules found for your address.</p>
-      </div>
+          {/* Empty State Mock */}
+          <div className="mt-12 border border-dashed border-gray-800 rounded-2xl p-12 text-center">
+            <p className="text-gray-600">No more vesting schedules found for your address.</p>
+          </div>
+        </>
+      ) : (
+        <GrantorPanel />
+      )}
 
       {selectedScheduleId !== null && (
         <ClaimModal
