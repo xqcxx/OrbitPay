@@ -2,6 +2,12 @@
 name = "governance"
 version = "0.1.0"
 edition = "2021"
+description = "OrbitPay on-chain governance proposal and voting contract"
+documentation = "https://xqcxx.github.io/OrbitPay/governance"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--enable-index-page", "-Zunstable-options"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
