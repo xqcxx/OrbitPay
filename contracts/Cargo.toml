@@ -6,6 +6,7 @@ members = [
     "contracts/payroll_stream",
     "contracts/vesting",
     "contracts/governance",
+    "integration_tests",
 ]
 
 [workspace.dependencies]

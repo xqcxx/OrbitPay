@@ -75,11 +75,44 @@ We follow a strict **Modular Commit** philosophy to ensure history is readable a
    # Frontend
    cd frontend && npm run lint
    ```
+   Cross-contract flows (governance budget paid out by the treasury, treasury
+   funds streamed through payroll or vested) live in `contracts/integration_tests`:
+   ```bash
+   cd contracts && cargo test -p integration_tests
+   ```
 5. **Commit**: Follow the commit guidelines above.
 6. **Pull Request**: Submit a PR with:
    - Reference the issue number (e.g., "Closes SC-4")
    - Description of changes
    - Testing notes
+
+## 🚰 Testnet Setup
+
+`scripts/fund-testnet.sh` creates development accounts as stellar CLI identities
+and funds each one with XLM from [Friendbot](https://friendbot.stellar.org).
+Secret keys stay in the CLI keystore, so nothing sensitive lands in the repo.
+
+```bash
+# Fund the default accounts: orbitpay-admin, orbitpay-employer,
+# orbitpay-employee-1, orbitpay-employee-2
+./scripts/fund-testnet.sh
+
+# Fund your own set of accounts (the first one is the token issuer)
+./scripts/fund-testnet.sh alice bob carol
+
+# Also issue a test token for payroll/vesting testing: deploys its Stellar
+# Asset Contract, adds trustlines and mints 1,000 tokens to every account
+# except the issuer
+./scripts/fund-testnet.sh --token OPAY
+
+# Choose the minted amount in stroops (7 decimals)
+./scripts/fund-testnet.sh --token OPAY --amount 50000000000
+```
+
+The script is safe to re-run. Accounts that already hold the Friendbot starting
+balance are skipped, and an existing token contract is reused. Pass the printed
+token contract ID as the `token` argument to `create_stream` or `create_schedule`,
+and the account names as `--source-account` to `stellar contract invoke`.
 
 ## 🗂 PR Review Checklist
 

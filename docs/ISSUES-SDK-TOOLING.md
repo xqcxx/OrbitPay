@@ -92,10 +92,10 @@ This document tracks tasks related to the TypeScript SDK, CLI tools, and DevOps 
 **Labels:** `testing`, `integration`
 **Description:** Cross-contract integration tests.
 - **Tasks:**
-  - [ ] Test governance → treasury fund disbursement flow.
-  - [ ] Test full lifecycle: deposit → stream → claim.
-  - [ ] Test full lifecycle: deposit → vest → claim.
-  - [ ] Simulate multi-user scenarios in test environment.
+  - [x] Test governance → treasury fund disbursement flow. (@Majormaxx - 2026-11-26 11:34 UTC)
+  - [x] Test full lifecycle: deposit → stream → claim. (@Majormaxx - 2026-11-26 11:34 UTC)
+  - [x] Test full lifecycle: deposit → vest → claim. (@Majormaxx - 2026-11-26 11:34 UTC)
+  - [x] Simulate multi-user scenarios in test environment. (@Majormaxx - 2026-11-26 11:34 UTC)
 
 ### Issue #TL-8: CI/CD Pipeline
 **Priority:** Medium
@@ -123,11 +123,11 @@ This document tracks tasks related to the TypeScript SDK, CLI tools, and DevOps 
 **Labels:** `tooling`, `testing`
 **Description:** Automate testnet funding for development.
 - **Tasks:**
-  - [ ] Create `scripts/fund-testnet.sh` script.
-  - [ ] Use Stellar Friendbot API for XLM funding.
-  - [ ] Fund multiple test accounts in batch.
-  - [ ] Wrap test token deployment for payroll/vesting testing.
-  - [ ] Add setup instructions to `CONTRIBUTING.md`.
+  - [x] Create `scripts/fund-testnet.sh` script. (@Majormaxx - 2026-11-26 11:34 UTC)
+  - [x] Use Stellar Friendbot API for XLM funding. (@Majormaxx - 2026-11-26 11:34 UTC)
+  - [x] Fund multiple test accounts in batch. (@Majormaxx - 2026-11-26 11:34 UTC)
+  - [x] Wrap test token deployment for payroll/vesting testing. (@Majormaxx - 2026-11-26 11:34 UTC)
+  - [x] Add setup instructions to `CONTRIBUTING.md`. (@Majormaxx - 2026-11-26 11:34 UTC)
 
 ---
 
