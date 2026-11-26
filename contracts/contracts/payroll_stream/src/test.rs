@@ -52,11 +52,6 @@ fn test_create_stream_transfers_tokens_and_saves_stream() {
     let token_client = create_token_client(&env, &token);
 
     token_admin_client.mint(&sender, &10000);
-    
-    let token_admin = Address::generate(&env);
-    let token_contract = create_token_contract(&env, &token_admin);
-    let token_client = create_token_client(&env, &token_contract.address);
-    token_contract.mint(&sender, &10000);
 
     client.initialize(&admin);
 
@@ -65,14 +60,6 @@ fn test_create_stream_transfers_tokens_and_saves_stream() {
     });
 
     let stream_id = client.create_stream(&sender, &recipient, &token, &10000, &1000, &2000);
-    let stream_id = client.create_stream(
-        &sender,
-        &recipient,
-        &token_contract.address,
-        &10000_i128,
-        &1000_u64,
-        &2000_u64,
-    );
 
     assert_eq!(stream_id, 0);
     assert_eq!(token_client.balance(&sender), 0);
@@ -109,9 +96,6 @@ fn test_create_stream_fails_without_balance_and_does_not_persist() {
     assert_eq!(client.get_stream_count(), 0);
     assert_eq!(token_client.balance(&sender), 5000);
     assert_eq!(token_client.balance(&client.address), 0);
-    
-    assert_eq!(token_client.balance(&sender), 0);
-    assert_eq!(token_client.balance(&client.address), 10000);
 }
 
 #[test]
@@ -172,10 +156,6 @@ fn test_calculate_claimable() {
     let token = token_admin_client.address.clone();
 
     token_admin_client.mint(&sender, &10000);
-    
-    let token_admin = Address::generate(&env);
-    let token_contract = create_token_contract(&env, &token_admin);
-    token_contract.mint(&sender, &10000);
 
     client.initialize(&admin);
 
@@ -184,14 +164,6 @@ fn test_calculate_claimable() {
     });
 
     let stream_id = client.create_stream(&sender, &recipient, &token, &10000, &1000, &2000);
-    let stream_id = client.create_stream(
-        &sender,
-        &recipient,
-        &token_contract.address,
-        &10000_i128,
-        &1000_u64,
-        &2000_u64,
-    );
 
     env.ledger().with_mut(|li| {
         li.timestamp = 1500;
@@ -213,11 +185,6 @@ fn test_claim_transfers_tokens_and_prevents_double_claim() {
     let token_client = create_token_client(&env, &token);
 
     token_admin_client.mint(&sender, &10000);
-    
-    let token_admin = Address::generate(&env);
-    let token_contract = create_token_contract(&env, &token_admin);
-    let token_client = create_token_client(&env, &token_contract.address);
-    token_contract.mint(&sender, &10000);
 
     client.initialize(&admin);
 
@@ -296,19 +263,6 @@ fn test_claim_rejects_when_claimable_is_zero() {
 
     let stream_id = client.create_stream(&sender, &recipient, &token, &10000, &1000, &2000);
     client.claim(&recipient, &stream_id);
-    let stream_id = client.create_stream(
-        &sender,
-        &recipient,
-        &token_contract.address,
-        &10000_i128,
-        &1000_u64,
-        &2000_u64,
-    );
-
-    client.cancel_stream(&sender, &stream_id);
-    
-    assert_eq!(token_client.balance(&sender), 10000);
-    assert_eq!(token_client.balance(&recipient), 0);
 }
 
 #[test]
@@ -323,9 +277,6 @@ fn test_cancel_stream_settles_midway() {
     let token_client = create_token_client(&env, &token);
 
     token_admin_client.mint(&sender, &10000);
-    let token_contract = create_token_contract(&env, &token_admin);
-    let token_client = create_token_client(&env, &token_contract.address);
-    token_contract.mint(&sender, &10000);
 
     client.initialize(&admin);
 
@@ -334,14 +285,6 @@ fn test_cancel_stream_settles_midway() {
     });
 
     let stream_id = client.create_stream(&sender, &recipient, &token, &10000, &1000, &2000);
-    let stream_id = client.create_stream(
-        &sender,
-        &recipient,
-        &token_contract.address,
-        &10000_i128,
-        &1000_u64,
-        &2000_u64,
-    );
 
     env.ledger().with_mut(|li| {
         li.timestamp = 1500;
@@ -428,9 +371,6 @@ fn test_cancel_stream_after_end() {
     let token_client = create_token_client(&env, &token);
 
     token_admin_client.mint(&sender, &10000);
-    let token_contract = create_token_contract(&env, &token_admin);
-    let token_client = create_token_client(&env, &token_contract.address);
-    token_contract.mint(&sender, &10000);
 
     client.initialize(&admin);
 
@@ -439,14 +379,6 @@ fn test_cancel_stream_after_end() {
     });
 
     let stream_id = client.create_stream(&sender, &recipient, &token, &10000, &1000, &2000);
-    let stream_id = client.create_stream(
-        &sender,
-        &recipient,
-        &token_contract.address,
-        &10000_i128,
-        &1000_u64,
-        &2000_u64,
-    );
 
     env.ledger().with_mut(|li| {
         li.timestamp = 2500;
@@ -649,11 +581,6 @@ fn test_multiple_concurrent_streams() {
     assert_eq!(token_client.balance(&recipient2), 2500);
 }
 
-fn create_token_contract<'a>(e: &Env, admin: &Address) -> token::StellarAssetClient<'a> {
-    let contract_addr = e.register_stellar_asset_contract_v2(admin.clone()).address();
-    token::StellarAssetClient::new(e, &contract_addr)
-}
-
 #[test]
 fn test_cancel_after_partial_claim() {
     let (env, admin, client) = setup_env();
@@ -733,8 +660,4 @@ fn test_claim_multiple_times_progression() {
 
     let stream = client.get_stream(&stream_id);
     assert_eq!(stream.status, StreamStatus::Completed);
-}
-
-fn create_token_client<'a>(e: &Env, contract_addr: &Address) -> token::Client<'a> {
-    token::Client::new(e, contract_addr)
 }

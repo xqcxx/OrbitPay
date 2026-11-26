@@ -72,8 +72,6 @@ impl PayrollStreamContract {
 
         token_client.transfer(&sender, &contract_address, &total_amount);
 
-        token::Client::new(&env, &token).transfer(&sender, &env.current_contract_address(), &total_amount);
-
         let stream_id = get_stream_count(&env);
         let stream = PayrollStream {
             id: stream_id,
@@ -226,9 +224,6 @@ impl PayrollStreamContract {
         if stream.claimed_amount >= stream.total_amount {
             stream.status = StreamStatus::Completed;
         }
-
-        token::Client::new(&env, &stream.token)
-            .transfer(&env.current_contract_address(), &recipient, &claimable);
 
         set_stream(&env, stream_id, &stream);
         token_client.transfer(&contract_address, &recipient, &claimable);
