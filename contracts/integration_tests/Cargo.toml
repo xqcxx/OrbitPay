@@ -1,0 +1,13 @@
+[package]
+name = "integration_tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Cross-contract integration tests for the OrbitPay contracts"
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+governance = { path = "../contracts/governance" }
+payroll_stream = { path = "../contracts/payroll_stream" }
+treasury = { path = "../contracts/treasury" }
+vesting = { path = "../contracts/vesting" }

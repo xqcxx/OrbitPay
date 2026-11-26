@@ -1,9 +1,9 @@
 #![no_std]
 use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Vec, symbol_short, token};
 
-mod errors;
+pub mod errors;
 mod storage;
-mod types;
+pub mod types;
 
 use errors::VestingError;
 use storage::{
